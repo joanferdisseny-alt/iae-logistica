@@ -1461,6 +1461,16 @@ dialog.ec-modal::backdrop { background: rgba(0, 0, 0, 0.68); }
 .ec-barcode-video { width: 100%; max-width: 480px; max-height: 320px; object-fit: cover; border-radius: 16px; background: #111; }
 .ec-receiving-allocation { display: grid; grid-template-columns: minmax(0, 2fr) minmax(80px, 1fr) auto; align-items: end; gap: 10px; }
 .ec-receiving-match { justify-content: flex-start; text-align: left; white-space: normal; }
+.ec-product-research { padding: 14px; border: 1px solid var(--ec-border-soft); border-radius: 14px; min-width: 0; }
+.ec-product-research .ec-row-wrap { align-items: end; }
+.ec-product-research .ec-row-wrap > * { min-width: 0; max-width: 100%; }
+.ec-product-research .ec-btn { min-height: 44px; white-space: normal; }
+.ec-product-facts { margin: 0; font-size: 13px; }
+.ec-product-facts > div { display: grid; grid-template-columns: minmax(90px, 1fr) minmax(0, 3fr); gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--ec-border-soft); }
+.ec-product-facts dt { color: var(--ec-muted); }
+.ec-product-facts dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.ec-product-mapping { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr)); gap: 10px; }
+.ec-product-mapping > * { min-width: 0; }
 @media (max-width: 520px) {
   .ec-receiving-allocation { grid-template-columns: minmax(0, 1fr) auto; }
   .ec-receiving-allocation > label:first-child { grid-column: 1 / -1; }

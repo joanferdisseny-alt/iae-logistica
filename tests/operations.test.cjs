@@ -94,6 +94,7 @@ function harness(options = {}) {
   const actions = load("app/dashboard/inventory/operations.ts", mocks);
   const page = load("app/dashboard/inventory/[itemId]/page.tsx", {
     ...mocks,
+    "@/lib/inventory/product-research": load("lib/inventory/product-research.ts", {}),
     "next/navigation": { notFound: () => { throw new Error("NOT_FOUND"); } },
     "next/link": ({ children }) => children,
     "@/app/dashboard/inventory/add-relation-form": { AddRelationForm: () => null },

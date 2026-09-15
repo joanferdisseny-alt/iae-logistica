@@ -94,6 +94,24 @@ test('barcode receiving: atomic distributions, variants, retries, cataloging and
     await assert.rejects(create({...record,name:'Otro'}));await assert.rejects(create({...record,headquarters_id:other}));await assert.rejects(create({...record,current_stock:1}));
     assert.equal(Number((await db.query('select current_stock from inventory_items where id=$1',[itemId])).rows[0].current_stock),0);
   });
+  await t.test('online drafts atomically save reviewed provenance once, without granting readers or foreign sites write access',async()=>{
+    await as(editor);const request=randomUUID();
+    const source={provider:'upcitemdb',code:'3017620422003',fetchedAt:'2026-09-16T10:00:00.000Z',reviewed:true};
+    const record={name:'Online draft',slug:'online-draft',template_id:template,headquarters_id:site,current_stock:0,technical_specs:{}};
+    const create=(r=record,s=source,key=request)=>db.query('select create_inventory_record_from_product($1,$2,$3) as id',[key,JSON.stringify(r),JSON.stringify(s)]);
+    const itemId=(await create()).rows[0].id;assert.equal((await create()).rows[0].id,itemId);
+    const history=(await db.query("select * from inventory_item_history where item_id=$1 and event_type='online_product_review'",[itemId])).rows;
+    assert.equal(history.length,1);assert.equal(history[0].actor_id,editor);assert.deepEqual(history[0].details.source,source);
+    assert.equal(Number((await db.query('select current_stock from inventory_items where id=$1',[itemId])).rows[0].current_stock),0);
+    await assert.rejects(create(record,{...source,provider:'openfoodfacts'}),/reutilizado/);
+    await as(admin);await assert.rejects(create(null));await assert.rejects(create([]));await as(editor);
+    for(const s of [{...source,reviewed:false},{...source,code:'3017620422004'},{...source,provider:'evil'},{...source,url:'javascript:alert(1)'}])await assert.rejects(create(record,s,randomUUID()));
+    await assert.rejects(create({...record,slug:'foreign-online',headquarters_id:other},source,randomUUID()));
+    await as(reader);await assert.rejects(create({...record,slug:'reader-online'},source,randomUUID()));
+    await as(foreign);assert.equal((await db.query('select * from inventory_item_history where item_id=$1',[itemId])).rows.length,0);
+    await as(null,'anon');await assert.rejects(create());
+    await as(editor);
+  });
   await t.test('serialized tools reject multi-unit or fractional placement atomically',async()=>{
     await as(admin);const record={name:'Taladro',slug:'receiving-drill',template_id:template,category:'consumable',headquarters_id:site,current_stock:0,serial_number:'SER-123',technical_specs:{}};
     const serialItem=(await db.query('select create_inventory_record_once($1,$2) as id',[randomUUID(),JSON.stringify(record)])).rows[0].id;

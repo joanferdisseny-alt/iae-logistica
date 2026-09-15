@@ -42,3 +42,7 @@ Regenera los instaladores después de modificar las migraciones con `node script
 # Recepcion por codigo de barras
 
 Nueva pantalla **Recepcion**: camara o lector USB, codigos por sede, variantes de marca/modelo, envases y reparto atomico por cajas/ubicaciones. Para activar en una base existente ejecuta `supabase/upgrade-barcode-receiving.sql`. Consulta [el flujo, permisos y comprobaciones](docs/barcode-receiving.md). La camara del movil necesita HTTPS; no se ha modificado la base remota automaticamente.
+
+## Borradores online por codigo de barras
+
+En Recepcion, un codigo desconocido permite buscar informacion externa, elegir una ficha existente y revisar los campos antes de crear el articulo, siempre sin stock. Ejecuta `supabase/upgrade-product-research.sql` en la base existente antes de desplegar: guarda la fuente revisada en el historial de forma atomica e idempotente. UPCitemdb no necesita API key; Open Food Facts requiere configurar `PRODUCT_LOOKUP_CONTACT` con un correo tecnico para identificar la aplicacion. Consulta [uso, limites y activacion](docs/product-research.md).

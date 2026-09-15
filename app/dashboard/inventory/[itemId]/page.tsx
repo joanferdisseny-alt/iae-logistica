@@ -6,8 +6,16 @@ import { StockSection } from "@/app/dashboard/inventory/stock-section";
 import { QrModal } from "@/app/dashboard/qr-modal";
 import { requireAccess } from "@/lib/auth/context";
 import { OperationsForm } from "@/app/dashboard/inventory/operations-form";
+import { productProviders, productSourceSchema, productSourceUrl } from "@/lib/inventory/product-research";
 
 export const dynamic = "force-dynamic";
+
+function ProductSourceHistory({ details }: { details: Record<string, unknown> | null }) {
+  const parsed = productSourceSchema.safeParse(details?.source);
+  if (!parsed.success) return null;
+  const source = parsed.data;
+  return <p className="ec-help">Datos externos revisados por el usuario. Código {source.code}. <a className="ec-link-strong" href={productSourceUrl(source.provider, source.code)} target="_blank" rel="noopener noreferrer">Fuente: {productProviders[source.provider]}</a></p>;
+}
 
 type ItemDetail = {
   id: string;
@@ -328,7 +336,8 @@ export default async function InventoryItemPage({
         <div className="ec-card-body ec-list">
           {historyResult.error ? <p className="ec-error" role="alert">No se pudo cargar el historial de ficha. Comprueba inventory_item_history y sus permisos.</p>
             : historyResult.data?.length ? historyResult.data.slice(0, 50).map((entry) => <div className="ec-list-item ec-list-item-block" key={entry.id}>
-              <strong>{entry.event_type}</strong>
+              <strong>{entry.event_type === "online_product_review" ? "Borrador online revisado" : entry.event_type}</strong>
+              {entry.event_type === "online_product_review" && <ProductSourceHistory details={entry.details}/>}
               <div className="ec-help"><time dateTime={entry.created_at}>{timestamp(entry.created_at)}</time> · Actor: {entry.actor_id ?? "No registrado"}</div>
               <details><summary>Ver cambios</summary><pre style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{JSON.stringify(entry.details ?? {}, null, 2)}</pre></details>
             </div>) : <p className="ec-muted">No hay cambios de ficha en esta página.</p>}

@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAccess } from "@/lib/auth/context";
 import { validateTemplateValues } from "@/lib/inventory/validation";
+import { productSourceSchema, type ProductSource } from "@/lib/inventory/product-research";
 
 async function checkedMutation(query: PromiseLike<{ error: { message: string } | null }>) {
   const result = await query;
@@ -404,6 +405,14 @@ export async function createInventoryItem(
   let technicalSpecs: Record<string, string> = {};
   const receivingId = String(formData.get("receivingId") ?? "");
   if (receivingId && !z.string().uuid().safeParse(receivingId).success) return { error: "Identificador de alta no válido." };
+  let productSource: ProductSource | undefined;
+  if (formData.has("productSource")) {
+    try {
+      const raw = String(formData.get("productSource"));
+      if (!receivingId || raw.length > 512) throw new Error();
+      productSource = productSourceSchema.parse(JSON.parse(raw));
+    } catch { return { error: "La fuente del borrador no es válida. Repite la revisión del producto." }; }
+  }
   const { data: templateRow } = await managerContext.supabase
     .from("inventory_templates")
     .select("id, code, category_code, inventory_template_fields(is_required, inventory_fields(field_key, field_type, options))")
@@ -528,13 +537,15 @@ export async function createInventoryItem(
     created_by: managerContext.userId,
     headquarters_id: headquartersId
   };
-  const { data: insertedItem, error } = receivingId
-    ? await managerContext.supabase.rpc("create_inventory_record_once", { p_id: receivingId, p_record: record })
+  const { data: insertedItem, error } = productSource
+    ? await managerContext.supabase.rpc("create_inventory_record_from_product", { p_id: receivingId, p_record: record, p_source: productSource })
+    : receivingId ? await managerContext.supabase.rpc("create_inventory_record_once", { p_id: receivingId, p_record: record })
     : await managerContext.supabase.rpc("create_inventory_record", { p_record: record,
       p_container_id: parsed.data.placementType === "container" ? parsed.data.containerId || null : null,
       p_quantity: currentStock, p_notes: parsed.data.containerNotes || null });
 
   if (error || !insertedItem) {
+    if (productSource && error?.code === "PGRST202") return { error: "Falta actualizar Supabase. Un administrador debe ejecutar supabase/upgrade-product-research.sql antes de guardar borradores online." };
     return { error: "No se ha podido crear el artículo: " + (error?.message ?? "Sin respuesta"), retry: !!receivingId && (!error?.code || error.code.startsWith("08") || error.code.startsWith("PGRST00")) };
   }
 
