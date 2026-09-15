@@ -1,0 +1,20 @@
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const { PGlite } = require('@electric-sql/pglite');
+test('generated installer and repeatable atomic upgrade run on an empty database',async t=>{
+  const db=new PGlite(); t.after(()=>db.close());
+  await db.exec(`create role authenticated; create role anon;
+    alter default privileges in schema public grant execute on functions to anon, authenticated;
+    create schema auth; create table auth.users(id uuid primary key,email text,raw_user_meta_data jsonb);
+    create function auth.uid() returns uuid language sql as $$ select null::uuid $$;
+    create schema storage;
+    create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);
+    create table storage.objects(id uuid,bucket_id text,name text); alter table storage.objects enable row level security;`);
+  await db.exec(fs.readFileSync('supabase/install.sql','utf8').replace('create extension if not exists "pgcrypto";',''));
+  await db.exec(fs.readFileSync('supabase/upgrade-2026-09-14.sql','utf8'));
+  await db.exec(fs.readFileSync('supabase/upgrade-2026-09-15.sql','utf8'));
+  const result=await db.query('select * from iae_internal.migrations');
+  assert.equal(result.rows.length,8);
+  assert.equal((await db.query("select public from storage.buckets where id='inventory-documents'")).rows[0].public,false);
+});
