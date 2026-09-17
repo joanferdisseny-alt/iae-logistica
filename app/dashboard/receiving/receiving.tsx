@@ -13,8 +13,6 @@ import { linkBarcode, lookupBarcode, requestCataloging } from "./actions";
 import { brandTotals, decimal, type Lookup, type Option, type Result } from "./model";
 import { BarcodeScanner } from "./scanner";
 import { ReceiptForm } from "./receipt-form";
-import { ProductResearch } from "./product-research";
-import type { ProductDraft } from "@/lib/inventory/product-research";
 
 type SiteOption=Option & {headquarters_id:string};
 export function Receiving({sites,locations,containers,templates,isAdmin,canCreate,initialSite}:{sites:Option[];locations:SiteOption[];containers:SiteOption[];templates:InventoryTemplateDefinition[];isAdmin:boolean;canCreate:boolean;initialSite:string}) {
@@ -88,8 +86,6 @@ function UnknownCode({code,site,isAdmin,canCreate,templates,onLinked,onLock}:{co
   const [result,setResult]=useState<Result>({});
   const [more,setMore]=useState(false);
   const [creationBusy,setCreationBusy]=useState(false);
-  const [productDraft,setProductDraft]=useState<ProductDraft|null>(null);
-  const [draftRevision,setDraftRevision]=useState(0);
   const retry=useRef<{kind:"link"|"request";input:unknown}|null>(null);
   const router=useRouter();
   const draftKey=`iae-code-operation-${site}-${code}`;
@@ -115,8 +111,7 @@ function UnknownCode({code,site,isAdmin,canCreate,templates,onLinked,onLock}:{co
   }
   return <div className="ec-stack">
     <h2 className="ec-h2">Código nuevo en esta sede</h2>
-    <p className="ec-help">Un código distinto puede corresponder al mismo artículo con otra marca. Confirma medidas, compatibilidad y unidad antes de asociarlo. La búsqueda online es opcional y siempre necesita revisión.</p>
-    {!selected && mode!=="new" && <ProductResearch code={code} site={site} templates={templates} canCreate={canCreate} disabled={busy||creationBusy||!!retry.current} onDraft={draft=>{setProductDraft(draft);setDraftRevision(value=>value+1);setMode("new");setResult({});}}/>}
+    <p className="ec-help">Un código distinto puede corresponder al mismo artículo con otra marca. Confirma medidas, compatibilidad y unidad antes de asociarlo. Se busca únicamente en el inventario de esta sede; los datos de artículos nuevos se introducen manualmente.</p>
     <div className="ec-row-wrap">
       {isAdmin&&<button className="ec-btn" type="button" disabled={busy||creationBusy||!!retry.current} onClick={()=>{setMode("search");setResult({});}}>Asociar a un artículo</button>}
       {canCreate&&<button className="ec-btn" type="button" disabled={busy||creationBusy||!!retry.current} onClick={()=>{setMode("new");setResult({});}}>Crear artículo nuevo</button>}
@@ -136,15 +131,15 @@ function UnknownCode({code,site,isAdmin,canCreate,templates,onLinked,onLock}:{co
       {isAdmin&&<Link href="/dashboard/templates" target="_blank" className="ec-btn">Configurar fichas en otra pestaña</Link>}
       <button className="ec-btn" type="button" onClick={()=>router.refresh()}>Actualizar catálogo de fichas</button>
       <p className="ec-help">Si no hay una ficha adecuada, solicita su configuración antes de recibir el material.</p>
-      <CreateInventoryItemForm key={draftRevision} initialProductDraft={productDraft??undefined} canChooseHeadquarters={false} headquarters={[]} userHeadquartersId={site} templates={templates} locations={[]} containers={[]} draftKey={`iae-new-item-${site}-${code}`} onBusy={setCreationBusy} onCreated={(id,name)=>{setSelected({id,name});setMode(isAdmin?"search":"request");}}/>
+      <CreateInventoryItemForm canChooseHeadquarters={false} headquarters={[]} userHeadquartersId={site} templates={templates} locations={[]} containers={[]} draftKey={`iae-new-item-${site}-${code}`} onBusy={setCreationBusy} onCreated={(id,name)=>{setSelected({id,name});setMode(isAdmin?"search":"request");}}/>
     </>}
     {selected&&isAdmin&&mode!=="request"&&<form className="ec-stack" onSubmit={e=>{
       e.preventDefault();const f=new FormData(e.currentTarget);void submit("link",{itemId:selected.id,code,brand:f.get("brand"),model:f.get("model"),units:f.get("units")});
     }}>
       <strong>Artículo: {selected.name}</strong>
       <fieldset className="ec-form-grid ec-receiving-fieldset" disabled={busy||!!retry.current}>
-        <label className="ec-label">Marca<input className="ec-input" name="brand" maxLength={80} defaultValue={productDraft?.variant?.brand??""} placeholder="Marca o Sin marca" required/></label>
-        <label className="ec-label">Modelo / variante (opcional)<input className="ec-input" name="model" maxLength={80} defaultValue={productDraft?.variant?.model??""}/></label>
+        <label className="ec-label">Marca<input className="ec-input" name="brand" maxLength={80} placeholder="Marca o Sin marca" required/></label>
+        <label className="ec-label">Modelo / variante (opcional)<input className="ec-input" name="model" maxLength={80}/></label>
         <label className="ec-label">Unidades del artículo por envase<input className="ec-input" name="units" inputMode="decimal" defaultValue="1" required/></label>
         <label className="ec-checkbox"><input type="checkbox" required/>He comprobado que es equivalente y utiliza la misma unidad de medida.</label>
       </fieldset>

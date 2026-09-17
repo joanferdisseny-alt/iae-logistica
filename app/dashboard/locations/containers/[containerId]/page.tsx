@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { QrModal } from "@/app/dashboard/qr-modal";
 import { CreateChecklistModal } from "@/app/dashboard/checklists/forms";
 import { todayInSpain } from "@/app/dashboard/checklists/model";
+import { stockQrPath } from "@/app/dashboard/checklists/scan-model";
 
 export const dynamic = "force-dynamic";
 
@@ -143,6 +144,7 @@ export default async function ContainerDetailPage({
                   <span className={`ec-badge ${badgeClass(entry.inventory_items?.status ?? "low")}`}>
                     {entry.inventory_items?.status ?? "sin dato"}
                   </span>
+                  <QrModal label="QR de existencias" path={stockQrPath(entry.id)} title={`${entry.inventory_items?.name ?? "Artículo"} · ${container.name} · Lote ${entry.inventory_stock_lots.code}`} />
                 </div>
               ))
             ) : (

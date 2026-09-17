@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAccess } from "@/lib/auth/context";
 import { validateTemplateValues } from "@/lib/inventory/validation";
-import { productSourceSchema, type ProductSource } from "@/lib/inventory/product-research";
+import { productSourceSchema, type ProductSource } from "@/lib/inventory/product-source";
 
 async function checkedMutation(query: PromiseLike<{ error: { message: string } | null }>) {
   const result = await query;
@@ -405,6 +405,7 @@ export async function createInventoryItem(
   let technicalSpecs: Record<string, string> = {};
   const receivingId = String(formData.get("receivingId") ?? "");
   if (receivingId && !z.string().uuid().safeParse(receivingId).success) return { error: "Identificador de alta no válido." };
+  // Old pending submissions must retain their exact RPC payload to avoid duplicate creation.
   let productSource: ProductSource | undefined;
   if (formData.has("productSource")) {
     try {
@@ -660,7 +661,7 @@ export async function createStorageLocation(
     return { error: `No se ha podido crear la ubicación: ${error.message}` };
   }
 
-  revalidatePath("/dashboard/locations");
+  revalidatePath("/dashboard/locations", "layout");
   revalidatePath("/dashboard/inventory");
   return { success: "Ubicación creada correctamente." };
 }
@@ -717,7 +718,7 @@ export async function updateStorageLocation(
     return { error: `No se ha podido actualizar la ubicación: ${error.message}` };
   }
 
-  revalidatePath("/dashboard/locations");
+  revalidatePath("/dashboard/locations", "layout");
   revalidatePath("/dashboard/inventory");
   return { success: "Ubicación actualizada correctamente." };
 }
@@ -773,7 +774,7 @@ export async function deleteStorageLocation(
     return { error: `No se ha podido borrar la ubicación: ${error.message}` };
   }
 
-  revalidatePath("/dashboard/locations");
+  revalidatePath("/dashboard/locations", "layout");
   revalidatePath("/dashboard/inventory");
   return { success: "Ubicación borrada correctamente." };
 }

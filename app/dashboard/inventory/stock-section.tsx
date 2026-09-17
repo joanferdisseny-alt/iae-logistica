@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { requireAccess } from "@/lib/auth/context";
 import { StockForm } from "./stock-form";
+import { QrModal } from "../qr-modal";
+import { stockQrPath } from "../checklists/scan-model";
 import { brandTotals, decimal } from "../receiving/model";
 import { positionLabel, type StockPosition, type StockLot, type StockOption } from "./stock-model";
 
-export async function StockSection({ itemId, headquartersId, unit }: { itemId: string; headquartersId: string | null; unit: string | null }) {
+export async function StockSection({ itemId, itemName, headquartersId, unit }: { itemId: string; itemName: string; headquartersId: string | null; unit: string | null }) {
   const { supabase, isAdmin } = await requireAccess();
   const positions: StockPosition[] = [];
   const lots: StockLot[] = [];
@@ -43,6 +45,7 @@ export async function StockSection({ itemId, headquartersId, unit }: { itemId: s
           <p className="ec-help">Lote: {p.inventory_stock_lots.code} · Caducidad: {p.inventory_stock_lots.expiration_date ?? "Sin fecha"}</p>
           {p.notes && <p className="ec-help">{p.notes}</p>}</div>
         <strong>{p.quantity} {unit ?? "uds."}</strong>
+        <QrModal label="QR de existencias" path={stockQrPath(p.id)} title={`${itemName} · ${positionLabel(p)} · Lote ${p.inventory_stock_lots.code}`} />
       </div>)}</div>
       {!positive.length && <p className="ec-muted">Sin existencias. Registra una entrada o recibe un nuevo lote.</p>}
     </div>

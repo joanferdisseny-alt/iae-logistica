@@ -5,6 +5,7 @@ import { requireAccess } from "@/lib/auth/context";
 import { ChecklistLineForm, CloseChecklistForm } from "../forms";
 import { checklistProgress, eventLabels, resultLabels, statusLabels, type Checklist, type ChecklistLine } from "../model";
 import { formatRequestDate } from "@/app/dashboard/requests/model";
+import { ScanReturns } from "../scan-return";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +42,7 @@ export default async function ChecklistPage({ params }: { params: Promise<{ chec
       {checklist.closed_at && <p className="ec-help">Cerrada el {formatRequestDate(checklist.closed_at)} por {checklist.closed_by_name}. {checklist.box_returned ? "Caja devuelta a su ubicación." : "Retorno de la caja no confirmado."}</p>}
       {checklist.summary && <p className="ec-checklist-notes">{checklist.summary}</p>}
     </div></section>
+    {canEdit && <ScanReturns checklistId={checklist.id} />}
     <div className="ec-checklist-lines">{lines.map(line => <section className="ec-card" key={line.id}>
       <div className="ec-card-body ec-stack">
         <div className="ec-row ec-row-between ec-row-wrap"><Link className="ec-link-strong" href={`/dashboard/inventory/${line.item_id}`}>{line.item_name}</Link>

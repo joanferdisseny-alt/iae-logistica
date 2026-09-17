@@ -23,11 +23,11 @@ export function QrModal({ label, path, title }: QrModalProps) {
 
     QRCode.toDataURL(targetUrl, {
       color: {
-        dark: "#071007",
-        light: "#b7ff13"
+        dark: "#000000",
+        light: "#ffffff"
       },
       errorCorrectionLevel: "M",
-      margin: 2,
+      margin: 4,
       width: 320
     })
       .then(setQrUrl)
@@ -36,7 +36,7 @@ export function QrModal({ label, path, title }: QrModalProps) {
 
   return (
     <>
-      <button className="ec-btn" onClick={() => setOpen(true)} type="button">
+      <button className="ec-btn" aria-label={`${label}: ${title}`} onClick={() => setOpen(true)} type="button">
         QR
       </button>
 
@@ -44,7 +44,7 @@ export function QrModal({ label, path, title }: QrModalProps) {
         <div className="ec-modal-backdrop" onClick={() => setOpen(false)} role="presentation">
           <div
             aria-modal="true"
-            className="ec-modal ec-modal-narrow"
+            className="ec-modal ec-modal-narrow ec-qr-dialog"
             onClick={(event) => event.stopPropagation()}
             role="dialog"
           ><DialogFocus />
@@ -53,7 +53,7 @@ export function QrModal({ label, path, title }: QrModalProps) {
                 <div className="ec-muted-2">{label}</div>
                 <h2 className="ec-h2">{title}</h2>
               </div>
-              <button className="ec-btn ec-btn-ghost" onClick={() => setOpen(false)} type="button">
+              <button className="ec-btn ec-btn-ghost ec-qr-no-print" onClick={() => setOpen(false)} type="button">
                 Cerrar
               </button>
             </div>
@@ -62,7 +62,7 @@ export function QrModal({ label, path, title }: QrModalProps) {
                 {qrUrl ? <img alt={`QR de ${title}`} src={qrUrl} /> : <span>Generando QR...</span>}
               </div>
               <div className="ec-qr-url">{targetUrl}</div>
-              <div className="ec-actions">
+              <div className="ec-actions ec-qr-no-print">
                 <a className="ec-btn ec-btn-primary" download={`${title}-qr.png`} href={qrUrl}>
                   Descargar
                 </a>

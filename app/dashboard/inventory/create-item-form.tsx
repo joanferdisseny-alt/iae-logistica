@@ -5,7 +5,6 @@ import { newChecklistId } from "../checklists/id";
 import { useActionState } from "react";
 import { createInventoryItem } from "@/app/dashboard/actions";
 import type { InventoryTemplateDefinition } from "@/lib/inventory/templates";
-import { productProviders, productSourceUrl, type ProductDraft } from "@/lib/inventory/product-research";
 
 type HeadquartersOption = {
   id: string;
@@ -27,8 +26,7 @@ export function CreateInventoryItemForm({
   userHeadquartersId,
   onCreated,
   draftKey,
-  onBusy,
-  initialProductDraft
+  onBusy
 }: {
   canChooseHeadquarters: boolean;
   containers: PlacementOption[];
@@ -39,7 +37,6 @@ export function CreateInventoryItemForm({
   onCreated?: (id: string, name: string) => void;
   draftKey?: string;
   onBusy?: (busy: boolean) => void;
-  initialProductDraft?: ProductDraft;
 }) {
   const receivingId = useRef<string | null>(null);
   const submitted = useRef<FormData | null>(null);
@@ -87,11 +84,10 @@ export function CreateInventoryItemForm({
     }catch{}
   },[draftKey]);
   useEffect(()=>{onBusy?.(pending||creationUncertain);return()=>onBusy?.(false);},[pending,creationUncertain,onBusy]);
-  const [selectedTemplateCode, setSelectedTemplateCode] = useState(initialProductDraft?.templateCode ?? templates[0]?.code ?? "");
+  const [selectedTemplateCode, setSelectedTemplateCode] = useState(templates[0]?.code ?? "");
   const [placementType, setPlacementType] = useState<"none" | "location" | "container">("none");
   const [selectedHeadquarters, setSelectedHeadquarters] = useState(userHeadquartersId ?? "");
   const selectedTemplate = templates.find((template) => template.code === selectedTemplateCode) ?? templates[0];
-  const draft = selectedTemplate?.code === initialProductDraft?.templateCode ? initialProductDraft : undefined;
   const visibleLocations = locations.filter(option => option.headquarters_id === selectedHeadquarters);
   const visibleContainers = containers.filter(option => option.headquarters_id === selectedHeadquarters);
 
@@ -109,10 +105,6 @@ export function CreateInventoryItemForm({
     <form action={formAction} className="ec-stack">
       {onCreated && <p className="ec-help">Alta de catálogo sin existencias. Después se asociará el código y un administrador confirmará la entrada.</p>}
       <fieldset className="ec-stack ec-receiving-fieldset" disabled={pending || creationUncertain}>
-      {draft && <>
-        <input type="hidden" name="productSource" value={JSON.stringify(draft.source)}/>
-        <p className="ec-help">Borrador revisable de <a href={productSourceUrl(draft.source.provider,draft.source.code)} target="_blank" rel="noopener noreferrer">{productProviders[draft.source.provider]}</a>. Comprueba y completa los datos antes de crear el artículo.</p>
-      </>}
       <input name="templateCode" type="hidden" value={selectedTemplate?.code ?? ""} />
       <input name="category" type="hidden" value={selectedTemplate?.category ?? "material"} />
       {!canChooseHeadquarters ? (
@@ -233,7 +225,6 @@ export function CreateInventoryItemForm({
                   <textarea
                     className="ec-textarea"
                     name={inputName}
-                    defaultValue={draft?.values[field.key] ?? ""}
                     placeholder={field.placeholder}
                     required={field.required}
                     rows={3}
@@ -246,7 +237,7 @@ export function CreateInventoryItemForm({
               return (
                 <label className="ec-label" key={field.key}>
                   <span>{field.label}</span>
-                  <select className="ec-select" name={inputName} required={field.required} defaultValue={draft?.values[field.key] ?? ""}>
+                  <select className="ec-select" name={inputName} required={field.required}>
                     <option value="">Selecciona</option>
                     {(field.options ?? []).map((option) => (
                       <option key={option} value={option}>
@@ -274,7 +265,6 @@ export function CreateInventoryItemForm({
                   step={field.type === "number" ? "0.001" : undefined}
                   className="ec-input"
                   name={inputName}
-                  defaultValue={draft?.values[field.key] ?? ""}
                   placeholder={field.placeholder}
                   required={field.required}
                   type={field.type === "number" ? "number" : field.type === "date" ? "date" : "text"}

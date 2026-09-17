@@ -31,6 +31,7 @@ Para activar los checklists, ejecuta `supabase/upgrade-checklists-2026-09-15.sql
 - Setup completo: [setup.md](/Users/joanferriscervero/Downloads/iae-logistica/docs/setup.md)
 - Avisos de seguridad de Supabase: [correccion y avisos intencionados](docs/supabase-security-warnings.md).
 - Checklists: [activación, flujo de retorno y límites](docs/checklists.md).
+- Devoluciones con QR: [etiquetas por caja/lote y confirmación de cantidades](docs/checklist-qr.md).
 - Existencias: [reparto por lotes y ubicaciones](docs/distributed-stock.md).
 
 ## Verificación local
@@ -43,6 +44,6 @@ Regenera los instaladores después de modificar las migraciones con `node script
 
 Nueva pantalla **Recepcion**: camara o lector USB, codigos por sede, variantes de marca/modelo, envases y reparto atomico por cajas/ubicaciones. Para activar en una base existente ejecuta `supabase/upgrade-barcode-receiving.sql`. Consulta [el flujo, permisos y comprobaciones](docs/barcode-receiving.md). La camara del movil necesita HTTPS; no se ha modificado la base remota automaticamente.
 
-## Borradores online por codigo de barras
+## Busqueda de codigos
 
-En Recepcion, un codigo desconocido permite buscar informacion externa, elegir una ficha existente y revisar los campos antes de crear el articulo, siempre sin stock. Ejecuta `supabase/upgrade-product-research.sql` en la base existente antes de desplegar: guarda la fuente revisada en el historial de forma atomica e idempotente. UPCitemdb no necesita API key; Open Food Facts requiere configurar `PRODUCT_LOOKUP_CONTACT` con un correo tecnico para identificar la aplicacion. Consulta [uso, limites y activacion](docs/product-research.md).
+En Recepcion los codigos se buscan exclusivamente en el inventario de la sede. Los articulos nuevos se crean manualmente con una ficha existente o se solicitan a logistica. La busqueda en internet se ha retirado; no requiere claves ni configuracion de proveedores. Se conserva el historial anterior y la compatibilidad con altas pendientes. Consulta [la retirada de la busqueda online](docs/product-research-retired.md).

@@ -6,7 +6,7 @@ import { StockSection } from "@/app/dashboard/inventory/stock-section";
 import { QrModal } from "@/app/dashboard/qr-modal";
 import { requireAccess } from "@/lib/auth/context";
 import { OperationsForm } from "@/app/dashboard/inventory/operations-form";
-import { productProviders, productSourceSchema, productSourceUrl } from "@/lib/inventory/product-research";
+import { productProviders, productSourceSchema, productSourceUrl } from "@/lib/inventory/product-source";
 
 export const dynamic = "force-dynamic";
 
@@ -218,7 +218,7 @@ export default async function InventoryItemPage({
         </div>
       </section>
 
-      <StockSection itemId={item.id} headquartersId={item.headquarters_id} unit={item.unit} />
+      <StockSection itemId={item.id} itemName={item.name} headquartersId={item.headquarters_id} unit={item.unit} />
       <section className="ec-grid-admin">
         <article className="ec-card">
           <div className="ec-card-header">
