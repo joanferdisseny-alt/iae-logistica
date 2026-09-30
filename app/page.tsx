@@ -18,18 +18,18 @@ const inventoryFamilies = [
   }
 ];
 
-const roadmap = [
+const workflow = [
   {
-    step: "Fase 1",
-    detail: "Arranque de Supabase, autenticación, perfiles y roles administrados por el equipo."
+    step: "Localiza",
+    detail: "Consulta el material de cada sede y su reparto entre ubicaciones físicas y cajas."
   },
   {
-    step: "Fase 2",
-    detail: "CRUD de inventario, carga de imágenes, etiquetas, ubicaciones y entradas/salidas."
+    step: "Prepara",
+    detail: "Revisa existencias, estado operativo y necesidades de material antes de una actividad."
   },
   {
-    step: "Fase 3",
-    detail: "Alertas de caducidad, mínimos de stock y panel operativo para administración."
+    step: "Comprueba",
+    detail: "Registra el retorno con un checklist de la caja y deja constancia de las incidencias."
   }
 ];
 
@@ -39,29 +39,29 @@ export default function HomePage() {
       <section className="ec-card">
         <div className="ec-card-header">
           <div className="ec-col">
-            <div className="ec-muted-2">IAE Logistica · Base inicial</div>
+            <div className="ec-muted-2">IAE Logística · Gestión de recursos</div>
             <h1 className="ec-h1">Inventario operativo para rescate y logística humanitaria.</h1>
           </div>
         </div>
         <div className="ec-card-body ec-stack">
           <p className="ec-muted">
-            Esta primera base está preparada para levantar una aplicación con Next.js,
-            Supabase y Vercel. El objetivo es centralizar materiales, herramientas,
-            consumibles y alimentos, con permisos por rol y alertas accionables.
+            Herramientas, consumibles, equipos y alimentos de la ONG en un único
+            inventario. Cada sede consulta sus recursos, ubicaciones y cajas,
+            con acceso según las responsabilidades de cada miembro.
           </p>
 
           <div className="ec-stat-grid">
             <article className="ec-stat">
-              <strong>4</strong>
-              dominios base
+              <strong>Sedes</strong>
+              Recursos organizados por sede
             </article>
             <article className="ec-stat">
-              <strong>3</strong>
-              niveles de acceso
+              <strong>Inventario</strong>
+              Existencias, lotes y ubicaciones
             </article>
             <article className="ec-stat">
-              <strong>1</strong>
-              flujo de despliegue
+              <strong>Cajas</strong>
+              Intervención y prácticas
             </article>
           </div>
 
@@ -79,29 +79,29 @@ export default function HomePage() {
       <section className="ec-grid-3">
         <article className="ec-card">
           <div className="ec-card-header">
-            <h2 className="ec-h2">Modelo inicial</h2>
+            <h2 className="ec-h2">Acceso por responsabilidades</h2>
           </div>
           <div className="ec-card-body ec-list">
             <div className="ec-list-item">
               <div>
                 <strong>Administrador</strong>
-                <div className="ec-muted">Gestiona usuarios, permisos, catálogo y alertas.</div>
+                <div className="ec-muted">Gestiona todas las sedes, usuarios, catálogo, existencias y avisos.</div>
               </div>
-              <span className="ec-badge ec-badge-neutral">Full</span>
+              <span className="ec-badge ec-badge-neutral">Administración</span>
             </div>
             <div className="ec-list-item">
               <div>
-                <strong>Operador</strong>
-                <div className="ec-muted">Registra entradas/salidas y actualiza fichas.</div>
+                <strong>Editor</strong>
+                <div className="ec-muted">Consulta los recursos de su sede y crea fichas de artículos.</div>
               </div>
-              <span className="ec-badge ec-badge-neutral">Edit</span>
+              <span className="ec-badge ec-badge-neutral">Alta</span>
             </div>
             <div className="ec-list-item">
               <div>
-                <strong>Consulta</strong>
-                <div className="ec-muted">Visualiza stock, estado y próximos vencimientos.</div>
+                <strong>Lector</strong>
+                <div className="ec-muted">Consulta el inventario, estado y ubicación de los recursos de su sede.</div>
               </div>
-              <span className="ec-badge ec-badge-neutral">Read</span>
+              <span className="ec-badge ec-badge-neutral">Consulta</span>
             </div>
           </div>
         </article>
@@ -122,10 +122,10 @@ export default function HomePage() {
 
       <section className="ec-card">
         <div className="ec-card-header">
-          <h2 className="ec-h2">Ruta de construcción</h2>
+          <h2 className="ec-h2">Antes y después de cada actividad</h2>
         </div>
         <div className="ec-card-body ec-list">
-          {roadmap.map((item) => (
+          {workflow.map((item) => (
             <article className="ec-list-item" key={item.step}>
               <strong>{item.step}</strong>
               <div className="ec-muted">{item.detail}</div>

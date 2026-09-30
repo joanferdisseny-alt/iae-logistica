@@ -2,6 +2,12 @@ const test=require('node:test');const assert=require('node:assert/strict');
 const fs=require('node:fs');const vm=require('node:vm');const ts=require('typescript');
 function load(file,mocks={}){const module={exports:{}};vm.runInNewContext(ts.transpileModule(fs.readFileSync('app/dashboard/receiving/'+file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{module,exports:module.exports,require:n=>Object.hasOwn(mocks,n)?mocks[n]:require(n)});return module.exports;}
 const model=load('model.ts');const id='11111111-1111-4111-8111-111111111111';
+test('display quantities use a decimal comma without ambiguous trailing thousands',()=>{
+  for(const [value, expected] of [[0n,'0'],[1n,'0,001'],[1000n,'1'],[1125n,'1,125'],[1100n,'1,1'],[1000000n,'1000'],[99999999999999n,'99999999999,999'],[-1125n,'-1,125']]) {
+    assert.equal(model.displayQuantity(value),expected);
+  }
+  assert.equal(model.decimal(1125n),'1.125');
+});
 const input={id,barcodeId:id,packs:'2',lotCode:'A',expiration:'2027-01-01',notes:'Compra',allocations:[{quantity:'1,125',location_id:id,container_id:null},{quantity:'8.875',location_id:null,container_id:id}]};
 test('barcode strings preserve zeros; receipt decimals are exact and dates are validated',()=>{
   assert.equal(model.barcodeSchema.parse('0012345678905'),'0012345678905');

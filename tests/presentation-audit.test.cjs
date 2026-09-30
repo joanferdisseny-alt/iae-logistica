@@ -16,6 +16,14 @@ function load(file, mocks = {}) {
 const all = node => Array.isArray(node) ? node.flatMap(all) : !node || typeof node !== 'object' ? [] : [node, ...all(node.props?.children)];
 const Link = ({ children, ...props }) => React.createElement('a', props, children);
 
+test('public landing explains current roles without promising editor stock mutations', () => {
+  const Page = load('app/page.tsx', { 'next/link': Link }).default;
+  const html = renderToStaticMarkup(Page());
+  for (const role of ['Administrador', 'Editor', 'Lector']) assert.ok(html.includes(role));
+  assert.doesNotMatch(html, /Base inicial|Modelo inicial|Ruta de construcción|Operador|Registra entradas\/salidas/);
+  assert.match(html, /crea fichas de artículos/);
+});
+
 test('dashboard only offers administration to admins and exposes operational sections to all roles', async () => {
   for (const role of ['admin', 'editor', 'reader']) {
     const page = load('app/dashboard/page.tsx', {

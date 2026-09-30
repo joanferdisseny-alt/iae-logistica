@@ -3,7 +3,7 @@ import { requireAccess } from "@/lib/auth/context";
 import { StockForm } from "./stock-form";
 import { QrModal } from "../qr-modal";
 import { stockQrPath } from "../checklists/scan-model";
-import { brandTotals, decimal } from "../receiving/model";
+import { brandTotals, displayQuantity } from "../receiving/model";
 import { positionLabel, type StockPosition, type StockLot, type StockOption } from "./stock-model";
 
 export async function StockSection({ itemId, itemName, headquartersId, unit }: { itemId: string; itemName: string; headquartersId: string | null; unit: string | null }) {
@@ -37,7 +37,7 @@ export async function StockSection({ itemId, itemName, headquartersId, unit }: {
       {isAdmin && !optionsError && <StockForm itemId={itemId} positions={positions} lots={lots} locations={locations} containers={containers} />}</div>
     <div className="ec-card-body ec-stack">
       <p className="ec-help">Una ficha, varias cantidades. Cada caja hereda su ubicación física. Los lotes conservan su propia caducidad.</p>
-      <div className="ec-stock-grid">{brandTotals(positive).map((group,index)=><div className="ec-stock-position" key={index}><span>{group.label}</span><strong>{decimal(group.quantity)} {unit??"uds."}</strong></div>)}</div>
+      <div className="ec-stock-grid">{brandTotals(positive).map((group,index)=><div className="ec-stock-position" key={index}><span>{group.label}</span><strong>{displayQuantity(group.quantity)} {unit??"uds."}</strong></div>)}</div>
       {isAdmin && <p className="ec-help">Para entradas identificadas por marca, utiliza <Link href="/dashboard/receiving">Recepción</Link>. Los lotes manuales o antiguos sin variante se muestran como marca no registrada.</p>}
       {optionsError && <p className="ec-error">No se pudieron cargar los destinos. La gestión no está disponible.</p>}
       <div className="ec-stock-grid">{positive.map(p => <div className="ec-stock-position" key={p.id}>

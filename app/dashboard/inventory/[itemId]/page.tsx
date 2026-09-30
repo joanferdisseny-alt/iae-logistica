@@ -114,6 +114,18 @@ function badgeClass(status: string) {
   return "ec-badge-bad";
 }
 
+async function readRelationOptions(query: (from: number, to: number) => PromiseLike<{
+  data: RelatedItem[] | null; error: { message: string } | null;
+}>) {
+  const items: RelatedItem[] = [];
+  for (let from = 0; ; from += 500) {
+    const { data, error } = await query(from, from + 499);
+    if (error || !data) return { data: [], error: error ?? { message: "Respuesta sin datos" } };
+    items.push(...data);
+    if (data.length < 500) return { data: items, error: null };
+  }
+}
+
 export default async function InventoryItemPage({
   params,
   searchParams
@@ -155,9 +167,9 @@ export default async function InventoryItemPage({
     : { data: [] as RelatedItem[], error: null };
 
   // Readers/editors never load option catalogues; admin options stay within this item's site.
-  const otherItemsResult = isAdmin ? await supabase.from("inventory_items")
+  const otherItemsResult = isAdmin ? await readRelationOptions((from, to) => supabase.from("inventory_items")
     .select("id, name, current_stock, unit, status").neq("id", itemId).or(headquartersFilter)
-    .order("name").returns<RelatedItem[]>() : { data: [], error: null };
+    .order("name").order("id").range(from, to).returns<RelatedItem[]>()) : { data: [], error: null };
   const movementsResult = await supabase.from("inventory_movements")
     .select("id, movement_type, quantity, balance_after, request_id, notes, created_by, created_at")
     .eq("item_id", itemId).order("created_at", { ascending: false }).order("id", { ascending: false })
@@ -277,6 +289,7 @@ export default async function InventoryItemPage({
             </div>
           </article>
 
+          {canManage && optionsError && <p className="ec-error" role="alert">No se pudo cargar el catálogo completo de artículos para asociar. Vuelve a cargar la ficha.</p>}
           {canManage && !optionsError ? (
             <article className="ec-card ec-card-toned">
               <div className="ec-card-header">

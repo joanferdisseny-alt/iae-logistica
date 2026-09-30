@@ -30,6 +30,12 @@ export function milli(value: string): bigint {
   return BigInt(whole)*1000n+BigInt(fraction.padEnd(3,"0"));
 }
 export function decimal(value: bigint) { return `${value/1000n}.${String(value%1000n).padStart(3,"0")}`; }
+// Display exact thousandths in Spanish; keep decimal() unchanged for machine values.
+export function displayQuantity(value: bigint) {
+  const magnitude = value < 0n ? -value : value;
+  const fraction = String(magnitude % 1000n).padStart(3, "0").replace(/0+$/, "");
+  return `${value < 0n ? "-" : ""}${magnitude / 1000n}${fraction ? `,${fraction}` : ""}`;
+}
 export function brandTotals(positions: StockPosition[]) {
   const groups=new Map<string,{label:string;quantity:bigint}>();
   for(const position of positions) {

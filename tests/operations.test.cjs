@@ -67,7 +67,10 @@ function harness(options = {}) {
           return { data: table === "inventory_items" && !options.missingItem ? item : null, error: null };
         },
         async returns() {
-          return { data: options.rows?.[table] ?? [], error: options.queryErrors?.[table] ?? null };
+          const rows = options.rows?.[table] ?? [];
+          return { data: query.range ? rows.slice(query.range[0], query.range[1] + 1) : rows,
+            error: options.failLaterOptions && table === "inventory_items" && query.range?.[0] > 0
+              ? { message: "Offline" } : options.queryErrors?.[table] ?? null };
         },
         async insert(values) {
           calls.push({ table, values });
@@ -98,7 +101,7 @@ function harness(options = {}) {
     "@/lib/inventory/product-source": load("lib/inventory/product-source.ts", {}),
     "next/navigation": { notFound: () => { throw new Error("NOT_FOUND"); } },
     "next/link": ({ children }) => children,
-    "@/app/dashboard/inventory/add-relation-form": { AddRelationForm: () => null },
+    "@/app/dashboard/inventory/add-relation-form": { AddRelationForm: ({ options }) => `RELATION_OPTIONS:${options.length}` },
     "@/app/dashboard/inventory/document-form": { DocumentForm: () => null },
     "@/app/dashboard/inventory/stock-section": { StockSection: ({ itemId }) => `STOCK_DISTRIBUTION:${itemId}` },
     "@/app/dashboard/inventory/operations-form": { OperationsForm: () => "ADMIN_OPERATIONS" },
@@ -246,6 +249,25 @@ test("missing item stops detail loading before histories or option queries", asy
   const h = harness({ missingItem: true });
   await assert.rejects(h.page({ params: Promise.resolve({ itemId }) }), /NOT_FOUND/);
   assert.equal(h.queries.length, 1);
+});
+
+test("relation options paginate the complete site catalogue and reject partial results", async () => {
+  const rows = { inventory_items: Array.from({ length: 501 }, (_, index) => ({
+    id: String(index), name: `Material ${index}`, current_stock: 1, status: "ok", unit: "uds."
+  })) };
+  const h = harness({ rows });
+  const html = renderToStaticMarkup(await h.page({ params: Promise.resolve({ itemId }) }));
+  assert.match(html, /RELATION_OPTIONS:501/);
+  const queries = h.queries.filter(query => query.table === "inventory_items" && query.range);
+  assert.deepEqual(queries.map(query => Array.from(query.range)), [[0, 499], [500, 999]]);
+  for (const query of queries) {
+    assert.ok(query.filters.some(filter => filter.join(":") === `or:headquarters_id.eq.${headquartersId}`));
+    assert.ok(query.filters.some(filter => filter.join(":") === `neq:id:${itemId}`));
+  }
+  const failed = harness({ rows, failLaterOptions: true });
+  const failureHtml = renderToStaticMarkup(await failed.page({ params: Promise.resolve({ itemId }) }));
+  assert.match(failureHtml, /No se pudo cargar el catálogo completo/);
+  assert.doesNotMatch(failureHtml, /RELATION_OPTIONS/);
 });
 
 test("detail renders safe links only and reports history query failures", async () => {

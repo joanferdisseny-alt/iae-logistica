@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { receiveBarcode } from "./actions";
-import { decimal, milli, receiptSchema, type Barcode, type Option, type ReceiptInput, type Result } from "./model";
+import { displayQuantity, milli, receiptSchema, type Barcode, type Option, type ReceiptInput, type Result } from "./model";
 import { newChecklistId } from "../checklists/id";
 
 export function ReceiptForm({barcode,locations,containers,onReceived,onLock}:{barcode:Barcode;locations:Option[];containers:Option[];onReceived:()=>void;onLock:(locked:boolean)=>void}) {
@@ -70,9 +70,9 @@ export function ReceiptForm({barcode,locations,containers,onReceived,onLock}:{ba
       </div>)}
       <button className="ec-btn" type="button" disabled={rows.length>=100} onClick={()=>setRows([...rows,{key:nextKey.current++,destination:"",quantity:""}])}>Añadir destino</button>
     </fieldset>
-    <p aria-live="polite"><strong>Total recibido: {decimal(total)} · Repartido: {decimal(assigned)}</strong></p>
+    <p aria-live="polite"><strong>Total recibido: {displayQuantity(total)} · Repartido: {displayQuantity(assigned)}</strong></p>
     {preview && !confirmed && <div className="ec-stock-position ec-stack">
-      <strong>Confirmar entrada de {decimal(total)} {barcode.inventory_items.unit||"uds."} de {barcode.inventory_items.name}</strong>
+      <strong>Confirmar entrada de {displayQuantity(total)} {barcode.inventory_items.unit||"uds."} de {barcode.inventory_items.name}</strong>
       <p>{barcode.inventory_variants.brand} {barcode.inventory_variants.model} · {rows.length} destino(s). Se sumará al stock actual.</p>
       <p className="ec-help">Lote: {preview.lotCode||"Sin referencia del fabricante"} · Caducidad: {preview.expiration||"Sin fecha"} · Motivo: {preview.notes}</p>
       <div className="ec-row-wrap">

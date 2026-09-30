@@ -10,7 +10,7 @@ import { searchRequestArticles } from "../requests/actions";
 import type { RequestArticle } from "../requests/model";
 import { newChecklistId } from "../checklists/id";
 import { linkBarcode, lookupBarcode, requestCataloging } from "./actions";
-import { brandTotals, decimal, type Lookup, type Option, type Result } from "./model";
+import { brandTotals, displayQuantity, type Lookup, type Option, type Result } from "./model";
 import { BarcodeScanner } from "./scanner";
 import { ReceiptForm } from "./receipt-form";
 
@@ -63,7 +63,7 @@ export function Receiving({sites,locations,containers,templates,isAdmin,canCreat
         {lookup.barcode ? <>
           <h2 className="ec-h2"><Link href={`/dashboard/inventory/${lookup.barcode.item_id}`}>{lookup.barcode.inventory_items.name}</Link></h2>
           <p>Variante: <strong>{lookup.barcode.inventory_variants.brand} {lookup.barcode.inventory_variants.model}</strong> · {lookup.barcode.units_per_pack} {lookup.barcode.inventory_items.unit||"uds."}/envase</p>
-          <div className="ec-stock-grid">{brandTotals(lookup.positions).map((group,index)=><div className="ec-stock-position" key={index}><strong>{group.label}</strong><span>{decimal(group.quantity)} {lookup.barcode?.inventory_items.unit||"uds."}</span></div>)}</div>
+          <div className="ec-stock-grid">{brandTotals(lookup.positions).map((group,index)=><div className="ec-stock-position" key={index}><strong>{group.label}</strong><span>{displayQuantity(group.quantity)} {lookup.barcode?.inventory_items.unit||"uds."}</span></div>)}</div>
           <details><summary>Ver existencias y ubicaciones actuales de todas las marcas</summary>
             <div className="ec-stock-grid">{lookup.positions.map(p=><div className="ec-stock-position" key={p.id}>
               <div><strong>{positionLabel(p)}</strong><p className="ec-help">{p.inventory_stock_lots.code} · {p.inventory_stock_lots.expiration_date??"Sin caducidad"}</p></div><strong>{p.quantity} {lookup.barcode?.inventory_items.unit||"uds."}</strong>
