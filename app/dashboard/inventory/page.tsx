@@ -5,6 +5,7 @@ import { NotificationPreferencesModal } from "@/app/dashboard/inventory/notifica
 import type { InventoryTemplateDefinition } from "@/lib/inventory/templates";
 import { requireAccess } from "@/lib/auth/context";
 import { CatalogTable } from "../templates/catalog-table";
+import { currentInventoryStatus, filterInventoryStatus, inventoryToday } from "@/lib/inventory/expiry-status";
 
 export const dynamic = "force-dynamic";
 
@@ -132,6 +133,7 @@ export default async function InventoryPage({ searchParams }: {
   const q = param("q").slice(0, 120);
   const category = param("category");
   const status = param("status");
+  const today = inventoryToday();
   const operationalStatus = param("operational_status");
   const headquartersFilter = isAdmin ? param("headquarters") : profile.headquarters_id;
   if ((status && !Object.hasOwn(statusLabels, status)) ||
@@ -164,7 +166,7 @@ export default async function InventoryPage({ searchParams }: {
     .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
   if (q) itemsQuery.ilike("name", `%${q.replace(/[\\%_*]/g, "\\$&")}%`);
   if (category) itemsQuery.eq("category", category);
-  if (status) itemsQuery.eq("status", status);
+  filterInventoryStatus(itemsQuery, status, today);
   if (operationalStatus) itemsQuery.eq("operational_status", operationalStatus);
   if (headquartersFilter) itemsQuery.eq("headquarters_id", headquartersFilter);
   const headquartersQuery = supabase
@@ -220,7 +222,7 @@ export default async function InventoryPage({ searchParams }: {
     const countQuery = supabase.from("inventory_items").select("id", { count: "exact", head: true });
     if (q) countQuery.ilike("name", `%${q.replace(/[\\%_*]/g, "\\$&")}%`);
     if (category) countQuery.eq("category", category);
-    if (status) countQuery.eq("status", status);
+    filterInventoryStatus(countQuery, status, today);
     if (operationalStatus) countQuery.eq("operational_status", operationalStatus);
     if (headquartersFilter) countQuery.eq("headquarters_id", headquartersFilter);
     const response = await countQuery;
@@ -245,7 +247,7 @@ export default async function InventoryPage({ searchParams }: {
     }
     return <InventoryError message={`No se han podido cargar ${failed.map(([name]) => name).join(", ") || "los artículos y su recuento"}. No se muestra un listado parcial. Vuelve a intentarlo o contacta con un administrador.`} />;
   }
-  const items = itemsResponse.data;
+  const items = itemsResponse.data.map(item => ({ ...item, status: currentInventoryStatus(item, today) }));
   type StockRow = { item_id: string; quantity: number; location_id: string | null; inventory_containers: { name: string; code: string | null; location_id: string | null } | null };
   const stockResponse = items.length ? await readAll((from,to) => supabase.from("inventory_stock_positions")
     .select("item_id, quantity, location_id, inventory_containers(name, code, location_id)").in("item_id",items.map(i => i.id))

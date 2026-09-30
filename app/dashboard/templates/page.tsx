@@ -23,23 +23,27 @@ type TemplateRow = {
 };
 const fieldTypeLabels = { text: "Texto", number: "Número", date: "Fecha", textarea: "Texto largo", select: "Selección", boolean: "Sí / no" };
 
+async function readCatalog<T>(query: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>): Promise<T[]> {
+  const rows: T[] = [];
+  for (let from = 0; ; from += 500) {
+    const { data, error } = await query(from, from + 499);
+    if (error || !data) throw new Error("No se han podido cargar las fichas y su catálogo de campos.");
+    rows.push(...data);
+    if (data.length < 500) return rows;
+  }
+}
+
 export default async function TemplatesPage() {
   const { supabase, isAdmin } = await requireAccess();
   if (!isAdmin) redirect("/dashboard");
 
-  const [categoriesResponse, templatesResponse, fieldsResponse] = await Promise.all([
-    supabase.from("inventory_categories").select("code, name").order("name").returns<CategoryRow[]>(),
-    supabase.from("inventory_templates")
+  const [categories, templates, fields] = await Promise.all([
+    readCatalog((from, to) => supabase.from("inventory_categories").select("code, name").order("name").order("code").range(from, to).returns<CategoryRow[]>()),
+    readCatalog((from, to) => supabase.from("inventory_templates")
       .select("id, code, name, description, category_code, inventory_categories(name), inventory_template_fields(id, is_required, sort_order, inventory_fields(id, field_key, label, field_type, options))")
-      .order("name").returns<TemplateRow[]>(),
-    supabase.from("inventory_fields").select("id, field_key, label").order("label").returns<FieldCatalogRow[]>()
+      .order("name").order("id").range(from, to).returns<TemplateRow[]>()),
+    readCatalog((from, to) => supabase.from("inventory_fields").select("id, field_key, label").order("label").order("id").range(from, to).returns<FieldCatalogRow[]>())
   ]);
-  if (categoriesResponse.error || templatesResponse.error || fieldsResponse.error) {
-    throw new Error("No se han podido cargar las fichas y su catálogo de campos.");
-  }
-  const categories = categoriesResponse.data ?? [];
-  const templates = templatesResponse.data ?? [];
-  const fields = fieldsResponse.data ?? [];
 
   return <div className="ec-page">
     <TemplatesSubnav />

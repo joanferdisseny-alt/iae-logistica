@@ -94,6 +94,7 @@ function harness(options = {}) {
   const actions = load("app/dashboard/inventory/operations.ts", mocks);
   const page = load("app/dashboard/inventory/[itemId]/page.tsx", {
     ...mocks,
+    "@/lib/inventory/expiry-status": load("lib/inventory/expiry-status.ts", {}),
     "@/lib/inventory/product-source": load("lib/inventory/product-source.ts", {}),
     "next/navigation": { notFound: () => { throw new Error("NOT_FOUND"); } },
     "next/link": ({ children }) => children,

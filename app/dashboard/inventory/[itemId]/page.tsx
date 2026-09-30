@@ -7,6 +7,7 @@ import { QrModal } from "@/app/dashboard/qr-modal";
 import { requireAccess } from "@/lib/auth/context";
 import { OperationsForm } from "@/app/dashboard/inventory/operations-form";
 import { productProviders, productSourceSchema, productSourceUrl } from "@/lib/inventory/product-source";
+import { currentInventoryStatus, inventoryToday } from "@/lib/inventory/expiry-status";
 
 export const dynamic = "force-dynamic";
 
@@ -133,6 +134,7 @@ export default async function InventoryItemPage({
   const { data: item, error: itemError } = await itemQuery.maybeSingle<ItemDetail>();
   if (itemError) throw new Error("No se pudo cargar la ficha. Comprueba el contrato SQL y los permisos.");
   if (!item) notFound();
+  const status = currentInventoryStatus(item, inventoryToday());
   const headquartersFilter = item.headquarters_id
     ? `headquarters_id.eq.${item.headquarters_id}` : "headquarters_id.is.null";
 
@@ -184,7 +186,7 @@ export default async function InventoryItemPage({
               <h1 className="ec-h1">{item.name}</h1>
             </div>
             <div className="ec-actions">
-              <span className={`ec-badge ${badgeClass(item.status)}`}>{item.status}</span>
+              <span className={`ec-badge ${badgeClass(status)}`}>{({ ok: "Correcto", low: "Stock bajo", expired: "Caducado", maintenance: "Mantenimiento" } as Record<string, string>)[status] ?? status}</span>
               <span className="ec-badge ec-badge-neutral">{operationalLabels[item.operational_status] ?? item.operational_status}</span>
               <QrModal
                 label="QR de ficha"

@@ -34,6 +34,7 @@ function harness({ role = 'admin', rows = {}, failTable, active = true } = {}) {
     ], ...rows
   };
   const page = load('app/dashboard/inventory/page.tsx', {
+    '@/lib/inventory/expiry-status': load('lib/inventory/expiry-status.ts'),
     'next/link': ({ children, ...props }) => React.createElement('a', props, children),
     'next/navigation': { redirect: href => { throw Error('REDIRECT:' + href); } },
     '@/app/dashboard/inventory/create-item-modal': { CreateItemModal: () => React.createElement('button', null, 'Nueva ficha') },
@@ -50,6 +51,11 @@ function harness({ role = 'admin', rows = {}, failTable, active = true } = {}) {
             if (op === 'eq') list = list.filter(row => row[field] === value);
             if (op === 'in') list = list.filter(row => value.includes(row[field]));
             if (op === 'gt') list = list.filter(row => row[field] > value);
+            if (op === 'lt') list = list.filter(row => row[field] && row[field] < value);
+            if (op === 'or') {
+              const today = field.match(/expiration_date.gte.([0-9-]+)/)[1];
+              list = list.filter(row => !row.expiration_date || row.expiration_date >= today || row.current_stock === 0);
+            }
             if (op === 'ilike') list = list.filter(row => row[field].toLowerCase().includes(value.slice(1,-1).toLowerCase()));
           }
           return { data: list.slice(call.from, call.to + 1), count: list.length, error: null };
@@ -57,7 +63,7 @@ function harness({ role = 'admin', rows = {}, failTable, active = true } = {}) {
         const query = { select: () => query, order: () => query,
           range: (from,to) => { call.from = from; call.to = to; return query; },
           returns: async () => result(), maybeSingle: async () => ({ data: null, error: null }) };
-        for (const op of ['eq','ilike','in','gt']) query[op] = (field,value) => { call.filters.push([op,field,value]); return query; };
+        for (const op of ['eq','ilike','in','gt','lt','or']) query[op] = (field,value) => { call.filters.push([op,field,value]); return query; };
         return query;
       } }
     }) }
@@ -79,6 +85,23 @@ test('inventory is a compact expandable table with stock and both status indicat
   assert.match(html, /href="\/dashboard\/inventory\/drill"/); assert.match(html, /colSpan="4"/i);
   all(tree).filter(n => n.type === 'button')[1].props.onClick({ stopPropagation() {} });
   html = renderToStaticMarkup(h.render(props)); assert.doesNotMatch(html, /Caja rescate/); assert.match(html, /Sin configurar/); assert.match(html, /Sin existencias/);
+});
+
+test('expiry filters and badges use the current date even if no stock mutation refreshed SQL status', async () => {
+  const rows = { inventory_items: [
+    { ...item, id: 'expired', status: 'ok', expiration_date: '2000-01-01' },
+    { ...item, id: 'future', status: 'ok', expiration_date: '2999-01-01' },
+    { ...item, id: 'empty', status: 'low', current_stock: 0, expiration_date: '2000-01-01' }
+  ] };
+  const h = harness({ rows });
+  const expired = h.table(await h.page({ status: 'expired' })).props;
+  assert.equal(expired.rows.length, 1);
+  assert.equal(expired.rows[0].id, 'expired');
+  assert.match(renderToStaticMarkup(h.render(expired)), /Caducado/);
+  const valid = h.table(await h.page({ status: 'ok' })).props;
+  assert.deepEqual(Array.from(valid.rows, row => row.id), ['future']);
+  const low = h.table(await h.page({ status: 'low' })).props;
+  assert.deepEqual(Array.from(low.rows, row => row.id), ['empty']);
 });
 
 test('search is applied in the database across all items and pagination retains every filter', async () => {

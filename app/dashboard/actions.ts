@@ -1091,6 +1091,7 @@ export async function saveNotificationPreferences(
   }
 
   revalidatePath("/dashboard/inventory");
+  revalidatePath("/dashboard/users");
   return { success: "Configuración de avisos actualizada." };
 }
 
@@ -1179,6 +1180,7 @@ export async function createInventoryCategory(
   }
 
   revalidatePath("/dashboard/templates");
+  revalidatePath("/dashboard/templates/categories");
   revalidatePath("/dashboard/inventory");
   return { success: "Categoría creada." };
 }
@@ -1359,6 +1361,7 @@ export async function updateInventoryCategory(formData: FormData) {
     .eq("code", parsed.data.code));
 
   revalidatePath("/dashboard/templates");
+  revalidatePath("/dashboard/templates/categories");
   revalidatePath("/dashboard/inventory");
   return { success: "Cambios guardados." };
   } catch (error) {
@@ -1398,6 +1401,7 @@ export async function deleteInventoryCategory(formData: FormData) {
   await checkedMutation(supabase.from("inventory_categories").delete().eq("code", parsed.data.code));
 
   revalidatePath("/dashboard/templates");
+  revalidatePath("/dashboard/templates/categories");
   revalidatePath("/dashboard/inventory");
   return { success: "Cambios guardados." };
   } catch (error) {
