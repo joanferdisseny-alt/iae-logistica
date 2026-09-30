@@ -33,6 +33,7 @@ Para activar los checklists, ejecuta `supabase/upgrade-checklists-2026-09-15.sql
 - Checklists: [activación, flujo de retorno y límites](docs/checklists.md).
 - Devoluciones con QR: [etiquetas por caja/lote y confirmación de cantidades](docs/checklist-qr.md).
 - Existencias: [reparto por lotes y ubicaciones](docs/distributed-stock.md).
+- Conexion de Supabase: [comprobacion diaria independiente del correo](docs/database-check.md).
 
 ## Verificación local
 
