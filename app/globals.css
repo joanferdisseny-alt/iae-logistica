@@ -1054,11 +1054,6 @@ table.ec-table tbody tr:hover {
   color: var(--ec-fg);
 }
 
-table.ec-inventory-table {
-  table-layout: fixed;
-}
-
-table.ec-inventory-table td,
 .ec-locations-page .ec-list-item,
 .ec-locations-page .ec-badge {
   overflow-wrap: anywhere;
@@ -1258,71 +1253,6 @@ table.ec-inventory-table td,
     min-width: 720px;
   }
 
-  .ec-inventory-table-wrap {
-    overflow: visible;
-    border: 0;
-    background: transparent;
-  }
-
-  table.ec-inventory-table {
-    display: block;
-    min-width: 0;
-  }
-
-  .ec-inventory-table thead {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
-
-  .ec-inventory-table tbody {
-    display: grid;
-    gap: 10px;
-  }
-
-  .ec-inventory-table tbody tr {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    border: 1px solid var(--ec-border-soft);
-    border-radius: var(--ec-radius);
-    overflow: hidden;
-    background: var(--ec-surface-2);
-  }
-
-  table.ec-inventory-table td {
-    display: block;
-    min-width: 0;
-    padding: 8px 10px;
-    font-size: 13px;
-  }
-
-  .ec-inventory-table td::before {
-    content: attr(data-label);
-    display: block;
-    margin-bottom: 4px;
-    font-size: 11px;
-    font-weight: 800;
-    color: var(--ec-muted-2);
-  }
-
-  .ec-inventory-table td:first-child,
-  .ec-inventory-table td[data-label="Ubicación efectiva"],
-  .ec-inventory-table td:last-child {
-    grid-column: 1 / -1;
-  }
-
-  .ec-inventory-table td:first-child {
-    background: rgba(183, 255, 19, 0.045);
-  }
-
-  .ec-inventory-table td:last-child {
-    border-bottom: 0;
-  }
-
   .ec-modal-backdrop {
     padding: 10px;
     align-items: end;
@@ -1422,6 +1352,16 @@ table.ec-template-table .ec-template-summary > td {
 .ec-template-category { font-size: 12px; color: var(--ec-muted); overflow-wrap: anywhere; }
 .ec-template-count { font-size: 13px; font-variant-numeric: tabular-nums; }
 
+.ec-inventory-name-column { width: 46%; }
+.ec-inventory-stock-column { width: 14%; }
+.ec-inventory-alert-column { width: 20%; }
+.ec-inventory-catalog .ec-template-table-wrap { padding: 0; }
+.ec-inventory-catalog .ec-template-summary .ec-badge { padding: 3px 6px; font-size: 11px; line-height: 1.35; white-space: normal; overflow-wrap: anywhere; }
+.ec-inventory-detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; margin: 0; font-size: 13px; }
+.ec-inventory-detail-grid dt { color: var(--ec-muted); margin-bottom: 3px; }
+.ec-inventory-detail-grid dd { margin: 0; overflow-wrap: anywhere; }
+.ec-inventory-detail-locations { grid-column: 1 / -1; }
+
 table.ec-template-table .ec-template-expanded-row > td { padding: 0; }
 table.ec-template-table .ec-template-expanded-row:hover { background: transparent; }
 .ec-template-detail { padding: 14px; background: var(--ec-surface-2); border-left: 2px solid var(--ec-accent); }
@@ -1436,6 +1376,9 @@ table.ec-template-table .ec-template-expanded-row:hover { background: transparen
 .ec-template-empty { padding: 16px; margin: 0; }
 
 @media (max-width: 600px) {
+  .ec-inventory-name-column { width: 37%; }
+  .ec-inventory-stock-column { width: 15%; }
+  .ec-inventory-alert-column { width: 23%; }
   .ec-template-table-wrap { padding: 0 6px 6px; }
   .ec-template-name-column { width: 51%; }
   .ec-template-count-column { width: 60px; }

@@ -4,6 +4,7 @@ import { CreateItemModal } from "@/app/dashboard/inventory/create-item-modal";
 import { NotificationPreferencesModal } from "@/app/dashboard/inventory/notification-preferences-form";
 import type { InventoryTemplateDefinition } from "@/lib/inventory/templates";
 import { requireAccess } from "@/lib/auth/context";
+import { CatalogTable } from "../templates/catalog-table";
 
 export const dynamic = "force-dynamic";
 
@@ -421,73 +422,47 @@ export default async function InventoryPage({ searchParams }: {
             {totalItems ? `${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, totalItems)} de ${totalItems} artículos` : "0 artículos con estos filtros"}.
             {" "}Los indicadores de stock bajo y caducidad corresponden solo a los {items.length} artículos de esta página, no al total.
           </p>
-          <div className="ec-table-wrap ec-inventory-table-wrap">
-            <table className="ec-table ec-inventory-table" role="table" aria-label="Inventario filtrado">
-                <thead>
-                  <tr>
-                    <th scope="col">Artículo</th>
-                    <th scope="col">Sede</th>
-                    <th scope="col">Ubicación efectiva</th>
-                    <th scope="col">Stock</th>
-                    <th scope="col">Alerta</th>
-                    <th scope="col">Estado operativo</th>
-                    <th scope="col">Fechas</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {items?.length ? (
-                    items.map((item) => (
-                      <tr key={item.id}>
-                        <td data-label="Artículo">
-                          <strong>
-                            <Link className="ec-link-strong" href={`/dashboard/inventory/${item.id}`}>
-                              {item.name}
-                            </Link>
-                          </strong>
-                          <div className="ec-muted">
-                            {item.category}
-                            {item.subtype ? ` · ${item.subtype}` : ""}
-                          </div>
-                        </td>
-                        <td data-label="Sede">{item.headquarters?.name ?? "Sede no accesible"}</td>
-                        <td data-label="Ubicación efectiva">{effectiveLocation(item)}</td>
-                        <td data-label="Stock">
-                          {item.current_stock} {item.unit ?? "uds."}
-                          {item.minimum_stock !== null ? (
-                            <div className="ec-muted">mínimo {item.minimum_stock}</div>
-                          ) : null}
-                        </td>
-                        <td data-label="Alerta">
-                          <span className={`ec-badge ${statusBadge(item.status)}`}>
-                            {statusLabels[item.status] ?? item.status}
-                          </span>
-                        </td>
-                        <td data-label="Estado operativo">
-                          <span className={`ec-badge ${item.operational_status === "available" ? "ec-badge-ok" : item.operational_status === "repair" || item.operational_status === "inspection" ? "ec-badge-warn" : "ec-badge-neutral"}`}>
-                            {item.operational_status ? operationalLabels[item.operational_status] ?? item.operational_status : "Sin informar"}
-                          </span>
-                        </td>
-                        <td data-label="Fechas">
-                          <div className="ec-col">
-                            <span className="ec-muted">
-                              Caducidad: {item.expiration_date ?? "—"}
-                            </span>
-                            <span className="ec-muted">
-                              Mantenimiento: {item.maintenance_due_at ?? "—"}
-                            </span>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td className="ec-muted" colSpan={7}>
-                        No hay artículos que coincidan con los filtros en las sedes accesibles.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-            </table>
+          <div className="ec-inventory-catalog">
+            <CatalogTable
+              key={pageHref(page)}
+              columns={[
+                { label: "Artículo", className: "ec-inventory-name-column" },
+                { label: "Stock", className: "ec-inventory-stock-column" },
+                { label: "Alerta", className: "ec-inventory-alert-column" },
+                { label: "Estado" }
+              ]}
+              caption="Selecciona un artículo para ver sus ubicaciones, fechas y abrir la ficha completa."
+              emptyMessage="No hay artículos que coincidan con los filtros en las sedes accesibles."
+              rows={items.map(item => ({
+                id: item.id,
+                label: item.name,
+                cells: [
+                  <span key="stock" className="ec-template-count">{item.current_stock} {item.unit ?? "uds."}</span>,
+                  <span key="alert" className={`ec-badge ${statusBadge(item.status)}`}>{statusLabels[item.status] ?? item.status}</span>,
+                  <span key="status" className={`ec-badge ${item.operational_status === "available" ? "ec-badge-ok" : item.operational_status === "repair" || item.operational_status === "inspection" ? "ec-badge-warn" : "ec-badge-neutral"}`}>
+                    {item.operational_status ? operationalLabels[item.operational_status] ?? item.operational_status : "Sin informar"}
+                  </span>
+                ],
+                details: <>
+                  <div className="ec-template-detail-heading">
+                    <div className="ec-template-description">
+                      <strong>{categories.find(entry => entry.code === item.category)?.name ?? item.category}</strong>
+                      {item.subtype && <p className="ec-muted">{item.subtype}</p>}
+                    </div>
+                    <div className="ec-actions ec-template-detail-tools">
+                      <Link className="ec-btn ec-btn-primary" href={`/dashboard/inventory/${item.id}`}>Ver ficha completa</Link>
+                    </div>
+                  </div>
+                  <dl className="ec-inventory-detail-grid">
+                    <div><dt>Sede</dt><dd>{item.headquarters?.name ?? "Sede no accesible"}</dd></div>
+                    <div><dt>Stock mínimo</dt><dd>{item.minimum_stock !== null ? `${item.minimum_stock} ${item.unit ?? "uds."}` : "Sin configurar"}</dd></div>
+                    <div><dt>Caducidad</dt><dd>{item.expiration_date ?? "Sin fecha"}</dd></div>
+                    <div><dt>Mantenimiento</dt><dd>{item.maintenance_due_at ?? "Sin fecha"}</dd></div>
+                    <div className="ec-inventory-detail-locations"><dt>Ubicaciones y cantidades</dt><dd>{effectiveLocation(item)}</dd></div>
+                  </dl>
+                </>
+              }))}
+            />
           </div>
           <nav className="ec-row ec-row-between ec-row-wrap" aria-label="Paginación de inventario">
             {page > 1 ? <Link className="ec-btn" href={pageHref(page - 1)} rel="prev">Anterior</Link> : <span className="ec-help">Primera página</span>}
