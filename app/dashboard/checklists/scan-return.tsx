@@ -35,7 +35,7 @@ export function ScanReturns({ checklistId }: { checklistId: string }) {
       <p className="ec-help">Escanea la etiqueta de existencias de cada material. Confirma cuántas unidades vuelven y su estado. El QR identifica el grupo, no demuestra su cantidad ni modifica el stock.</p>
       {selected ? <ConfirmReturn key={`${selected.line.id}-${selected.line.revision}`} checklistId={checklistId} {...selected}
         onBack={() => { setSelected(null); setCode(""); setError(""); }} /> : <>
-        {!busy && <BarcodeScanner onRead={value => { void read(value); }} />}
+        {!busy && <BarcodeScanner mode="qr" onRead={value => { void read(value); }} />}
         <form className="ec-row ec-row-wrap" onSubmit={event => { event.preventDefault(); void read(code); }}>
           <label className="ec-label"><span>Enlace QR (lector externo o entrada manual)</span>
             <input className="ec-input" value={code} onChange={event => setCode(event.target.value)} maxLength={500} required disabled={busy} />
