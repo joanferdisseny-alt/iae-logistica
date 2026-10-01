@@ -73,6 +73,7 @@ for (const kind of ['fields', 'categories']) {
     const empty = () => null;
     const page = load(`app/dashboard/templates/${kind}/page.tsx`, {
       '@/lib/auth/context': { requireAccess: async () => ({ isAdmin, supabase: { from: () => query } }) },
+      '@/lib/inventory/categories': load('lib/inventory/categories.ts'),
       'next/navigation': { redirect: () => { throw new Error('REDIRECT'); } },
       '@/app/dashboard/templates/forms': { CreateFieldCatalogModal: empty, EditFieldForm: empty, CreateCategoryModal: empty, EditCategoryForm: empty },
       '@/app/dashboard/templates/special-keys-modal': { SpecialKeysModal: empty },

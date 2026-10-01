@@ -46,6 +46,7 @@ function templateHarness({ isAdmin = true, failSecondPage = false } = {}) {
   const CreateTemplateModal = () => null;
   const AssignFieldToTemplateModal = () => null;
   const page = load('app/dashboard/templates/page.tsx', {
+    '@/lib/inventory/categories': load('lib/inventory/categories.ts'),
     'next/link': Link,
     'next/navigation': { redirect: href => { throw new Error('REDIRECT:' + href); } },
     './subnav': { TemplatesSubnav: () => null },
@@ -111,7 +112,7 @@ test('category mutations refresh their own page and saved recipient preferences 
     const builder = {
       select: () => builder, eq: () => builder, insert: () => builder,
       update: () => builder, delete: () => builder, upsert: () => builder,
-      maybeSingle: async () => ({ data: { is_active: true }, error: null }),
+      maybeSingle: async () => ({ data: { code: 'tools', is_active: true }, error: result.error }),
       then: (resolve, reject) => Promise.resolve(result).then(resolve, reject)
     };
     const supabase = { from: () => builder };

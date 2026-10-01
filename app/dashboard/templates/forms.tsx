@@ -39,6 +39,7 @@ type CategoryRecord = {
   code: string;
   name: string;
   description: string | null;
+  parent_code: string | null;
 };
 
 type TemplateRecord = {
@@ -58,7 +59,18 @@ type TemplateFieldRecord = {
   options: string[];
 };
 
-export function CreateCategoryForm() {
+function CategoryParentSelect({ categories, value = "" }: { categories: CategoryOption[]; value?: string }) {
+  return <label className="ec-label">
+    <span>Categoría superior</span>
+    <select className="ec-select" name="parentCode" defaultValue={value}>
+      <option value="">Ninguna (categoría principal)</option>
+      {categories.map(category => <option key={category.code} value={category.code}>{category.name}</option>)}
+    </select>
+    <span className="ec-help">Selecciona una categoría para crear una subcategoría dentro de ella.</span>
+  </label>;
+}
+
+export function CreateCategoryForm({ categories }: { categories: CategoryOption[] }) {
   const [state, formAction, pending] = useActionState(createInventoryCategory, undefined);
 
   return (
@@ -71,6 +83,7 @@ export function CreateCategoryForm() {
         <span>Nombre</span>
         <input className="ec-input" name="name" placeholder="Herramienta eléctrica" required />
       </label>
+      <CategoryParentSelect categories={categories} />
       <label className="ec-label">
         <span>Descripción</span>
         <textarea className="ec-textarea" name="description" rows={3} />
@@ -84,7 +97,7 @@ export function CreateCategoryForm() {
   );
 }
 
-export function CreateCategoryModal() {
+export function CreateCategoryModal({ categories }: { categories: CategoryOption[] }) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -94,7 +107,7 @@ export function CreateCategoryModal() {
       </button>
 
       <ModalShell kicker="Categorias" open={open} setOpen={setOpen} title="Crear categoria">
-        <CreateCategoryForm />
+        <CreateCategoryForm categories={categories} />
       </ModalShell>
     </>
   );
@@ -320,7 +333,7 @@ function ModalShell({
   );
 }
 
-export function EditCategoryForm({ category }: { category: CategoryRecord }) {
+export function EditCategoryForm({ category, categories }: { category: CategoryRecord; categories: CategoryOption[] }) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -337,6 +350,7 @@ export function EditCategoryForm({ category }: { category: CategoryRecord }) {
               <span>Nombre</span>
               <input className="ec-input" defaultValue={category.name} name="name" required />
             </label>
+            <CategoryParentSelect categories={categories} value={category.parent_code ?? ""} />
             <label className="ec-label">
               <span>Descripción</span>
               <textarea

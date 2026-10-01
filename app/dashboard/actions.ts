@@ -59,6 +59,7 @@ const createInventoryCategorySchema = z.object({
     .min(2, "El código es obligatorio.")
     .regex(/^[a-z0-9_]+$/, "Usa minúsculas, números y guiones bajos."),
   name: z.string().min(2, "El nombre es obligatorio."),
+  parentCode: z.string().regex(/^[a-z0-9_]*$/, "Categoría superior no válida."),
   description: z.string().optional()
 });
 
@@ -86,6 +87,7 @@ const createInventoryTemplateFieldSchema = z.object({
 const updateInventoryCategorySchema = z.object({
   code: z.string().min(2),
   name: z.string().min(2, "El nombre es obligatorio."),
+  parentCode: z.string().regex(/^[a-z0-9_]*$/, "Categoría superior no válida."),
   description: z.string().optional()
 });
 
@@ -1161,6 +1163,7 @@ export async function createInventoryCategory(
   const parsed = createInventoryCategorySchema.safeParse({
     code: String(formData.get("code") ?? "").trim(),
     name: String(formData.get("name") ?? "").trim(),
+    parentCode: String(formData.get("parentCode") ?? "").trim(),
     description: String(formData.get("description") ?? "").trim() || undefined
   });
 
@@ -1172,11 +1175,12 @@ export async function createInventoryCategory(
   const { error } = await supabase.from("inventory_categories").insert({
     code: parsed.data.code,
     name: parsed.data.name,
+    parent_code: parsed.data.parentCode || null,
     description: parsed.data.description ?? null
   });
 
   if (error) {
-    return { error: "No se ha podido crear la categoría." };
+    return { error: categoryMutationError(error) };
   }
 
   revalidatePath("/dashboard/templates");
@@ -1334,78 +1338,64 @@ export async function addFieldToTemplate(
   return { success: "Campo añadido a la ficha." };
 }
 
+function categoryMutationError(error: { code?: string; message: string }, deleting = false) {
+  if (error.code === "23505") return "Ya existe una categoría con ese código.";
+  if (error.code === "23503" || error.code === "23001") return deleting
+    ? "No puedes eliminar una categoría con subcategorías, fichas o artículos asociados. Reasígnalos antes."
+    : "La categoría superior ya no existe. Actualiza la página y selecciona otra.";
+  if (error.code === "23514") return "Una categoría no puede depender de sí misma ni de sus subcategorías.";
+  if (error.code === "42703" || error.code === "PGRST204") {
+    return "Falta actualizar la base de datos: ejecuta supabase/upgrade-category-hierarchy.sql en Supabase.";
+  }
+  return "No se ha podido guardar la categoría. Comprueba tus permisos y vuelve a intentarlo.";
+}
+
 export async function updateInventoryCategory(formData: FormData) {
   try {
-  try {
-    await requireAdmin();
-  } catch {
-    return { error: "No se puede completar la operación. Revisa permisos, campos y elementos asociados." };
-  }
+    const { supabase } = await requireAdmin();
+    const parsed = updateInventoryCategorySchema.safeParse({
+      code: String(formData.get("code") ?? "").trim(),
+      name: String(formData.get("name") ?? "").trim(),
+      parentCode: String(formData.get("parentCode") ?? "").trim(),
+      description: String(formData.get("description") ?? "").trim() || undefined
+    });
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos." };
 
-  const parsed = updateInventoryCategorySchema.safeParse({
-    code: String(formData.get("code") ?? "").trim(),
-    name: String(formData.get("name") ?? "").trim(),
-    description: String(formData.get("description") ?? "").trim() || undefined
-  });
-
-  if (!parsed.success) {
-    return { error: "No se puede completar la operación. Revisa permisos, campos y elementos asociados." };
-  }
-
-  const supabase = await createClient();
-  await checkedMutation(supabase.from("inventory_categories")
-    .update({
+    const { data, error } = await supabase.from("inventory_categories").update({
       name: parsed.data.name,
+      parent_code: parsed.data.parentCode || null,
       description: parsed.data.description ?? null
-    })
-    .eq("code", parsed.data.code));
+    }).eq("code", parsed.data.code).select("code").maybeSingle();
+    if (error) return { error: categoryMutationError(error) };
+    if (!data) return { error: "La categoría ya no existe o no tienes permisos para editarla." };
 
-  revalidatePath("/dashboard/templates");
-  revalidatePath("/dashboard/templates/categories");
-  revalidatePath("/dashboard/inventory");
-  return { success: "Cambios guardados." };
-  } catch (error) {
-    return { error: error instanceof Error ? error.message : "No se han podido guardar los cambios." };
+    revalidatePath("/dashboard/templates");
+    revalidatePath("/dashboard/templates/categories");
+    revalidatePath("/dashboard/inventory");
+    return { success: "Cambios guardados." };
+  } catch {
+    return { error: "No se han podido guardar los cambios. Revisa tus permisos e inténtalo de nuevo." };
   }
 }
 
 export async function deleteInventoryCategory(formData: FormData) {
   try {
-  try {
-    await requireAdmin();
+    const { supabase } = await requireAdmin();
+    const parsed = deleteInventoryCategorySchema.safeParse({ code: String(formData.get("code") ?? "").trim() });
+    if (!parsed.success) return { error: "Selecciona una categoría válida." };
+
+    // Foreign keys check all dependants atomically, including concurrently created subcategories.
+    const { data, error } = await supabase.from("inventory_categories").delete()
+      .eq("code", parsed.data.code).select("code").maybeSingle();
+    if (error) return { error: categoryMutationError(error, true) };
+    if (!data) return { error: "La categoría ya no existe o no tienes permisos para eliminarla." };
+
+    revalidatePath("/dashboard/templates");
+    revalidatePath("/dashboard/templates/categories");
+    revalidatePath("/dashboard/inventory");
+    return { success: "Categoría eliminada." };
   } catch {
-    return { error: "No se puede completar la operación. Revisa permisos, campos y elementos asociados." };
-  }
-
-  const parsed = deleteInventoryCategorySchema.safeParse({
-    code: String(formData.get("code") ?? "").trim()
-  });
-
-  if (!parsed.success) {
-    return { error: "No se puede completar la operación. Revisa permisos, campos y elementos asociados." };
-  }
-
-  const supabase = await createClient();
-  const [{ data: templates }, { data: items }] = await Promise.all([
-    supabase
-      .from("inventory_templates")
-      .select("id")
-      .eq("category_code", parsed.data.code),
-    supabase.from("inventory_items").select("id").eq("category", parsed.data.code)
-  ]);
-
-  if ((templates?.length ?? 0) > 0 || (items?.length ?? 0) > 0) {
-    return { error: "No se puede completar la operación. Revisa permisos, campos y elementos asociados." };
-  }
-
-  await checkedMutation(supabase.from("inventory_categories").delete().eq("code", parsed.data.code));
-
-  revalidatePath("/dashboard/templates");
-  revalidatePath("/dashboard/templates/categories");
-  revalidatePath("/dashboard/inventory");
-  return { success: "Cambios guardados." };
-  } catch (error) {
-    return { error: error instanceof Error ? error.message : "No se han podido guardar los cambios." };
+    return { error: "No se ha podido eliminar la categoría. Revisa tus permisos e inténtalo de nuevo." };
   }
 }
 

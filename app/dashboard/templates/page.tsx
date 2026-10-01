@@ -4,10 +4,11 @@ import { redirect } from "next/navigation";
 import { AssignFieldToTemplateModal, CreateTemplateModal, EditTemplateForm, RemoveTemplateFieldForm } from "./forms";
 import { TemplatesSubnav } from "./subnav";
 import { TemplateTable } from "./template-table";
+import { categoryOptions, type InventoryCategory } from "@/lib/inventory/categories";
 
 export const dynamic = "force-dynamic";
 
-type CategoryRow = { code: string; name: string };
+type CategoryRow = InventoryCategory;
 type FieldCatalogRow = { id: string; field_key: string; label: string };
 type TemplateRow = {
   id: string; code: string; name: string; description: string | null; category_code: string;
@@ -38,12 +39,14 @@ export default async function TemplatesPage() {
   if (!isAdmin) redirect("/dashboard");
 
   const [categories, templates, fields] = await Promise.all([
-    readCatalog((from, to) => supabase.from("inventory_categories").select("code, name").order("name").order("code").range(from, to).returns<CategoryRow[]>()),
+    readCatalog((from, to) => supabase.from("inventory_categories").select("code, name, parent_code").order("name").order("code").range(from, to).returns<CategoryRow[]>()),
     readCatalog((from, to) => supabase.from("inventory_templates")
       .select("id, code, name, description, category_code, inventory_categories(name), inventory_template_fields(id, is_required, sort_order, inventory_fields(id, field_key, label, field_type, options))")
       .order("name").order("id").range(from, to).returns<TemplateRow[]>()),
     readCatalog((from, to) => supabase.from("inventory_fields").select("id, field_key, label").order("label").order("id").range(from, to).returns<FieldCatalogRow[]>())
   ]);
+  const options = categoryOptions(categories);
+  const categoryNames = new Map(options.map(category => [category.code, category.name]));
 
   return <div className="ec-page">
     <TemplatesSubnav />
@@ -53,7 +56,7 @@ export default async function TemplatesPage() {
           <h1 className="ec-h2">Fichas actuales</h1>
           <span className="ec-badge ec-badge-neutral">{templates.length}</span>
         </div>
-        <CreateTemplateModal categories={categories} />
+        <CreateTemplateModal categories={options} />
       </div>
       <TemplateTable rows={templates.map((template) => {
         const assignedFields = (template.inventory_template_fields ?? [])
@@ -64,7 +67,7 @@ export default async function TemplatesPage() {
         return {
           id: template.id,
           name: template.name,
-          category: template.inventory_categories?.name ?? template.category_code,
+          category: categoryNames.get(template.category_code) ?? template.inventory_categories?.name ?? template.category_code,
           fieldCount: assignedFields.length,
           details: <>
             <div className="ec-template-detail-heading">
@@ -73,7 +76,7 @@ export default async function TemplatesPage() {
                 {template.description && <p className="ec-muted">{template.description}</p>}
               </div>
               <div className="ec-actions ec-template-detail-tools">
-                <EditTemplateForm categories={categories} template={{
+                <EditTemplateForm categories={options} template={{
                   id: template.id, code: template.code, name: template.name,
                   description: template.description, categoryCode: template.category_code
                 }} />

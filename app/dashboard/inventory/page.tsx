@@ -6,6 +6,7 @@ import type { InventoryTemplateDefinition } from "@/lib/inventory/templates";
 import { requireAccess } from "@/lib/auth/context";
 import { CatalogTable } from "../templates/catalog-table";
 import { currentInventoryStatus, filterInventoryStatus, inventoryToday } from "@/lib/inventory/expiry-status";
+import { categoryBranch, categoryOptions, type InventoryCategory } from "@/lib/inventory/categories";
 
 export const dynamic = "force-dynamic";
 
@@ -155,6 +156,8 @@ export default async function InventoryPage({ searchParams }: {
   const canConfigureAlerts = isAdmin;
   const canChooseHeadquarters = isAdmin;
   const userHeadquartersId = profile.headquarters_id;
+  const categoriesPromise = readAll((from, to) => supabase.from("inventory_categories")
+    .select("code, name, parent_code").order("name").order("code").range(from, to).returns<InventoryCategory[]>());
   const itemsQuery = supabase
     .from("inventory_items")
     .select(
@@ -165,7 +168,6 @@ export default async function InventoryPage({ searchParams }: {
     .order("id", { ascending: true })
     .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
   if (q) itemsQuery.ilike("name", `%${q.replace(/[\\%_*]/g, "\\$&")}%`);
-  if (category) itemsQuery.eq("category", category);
   filterInventoryStatus(itemsQuery, status, today);
   if (operationalStatus) itemsQuery.eq("operational_status", operationalStatus);
   if (headquartersFilter) itemsQuery.eq("headquarters_id", headquartersFilter);
@@ -197,7 +199,8 @@ export default async function InventoryPage({ searchParams }: {
     containersResponse,
     categoriesResponse
   ] = await Promise.all([
-    itemsQuery.returns<InventoryRow[]>(),
+    category ? categoriesPromise.then(response => itemsQuery
+      .in("category", categoryBranch(category, response.data)).returns<InventoryRow[]>()) : itemsQuery.returns<InventoryRow[]>(),
     supabase
       .from("notification_preferences")
       .select("notification_email, expiry_warning_days, email_notifications_enabled")
@@ -213,15 +216,14 @@ export default async function InventoryPage({ searchParams }: {
     readAll((from, to) => headquartersQuery.range(from, to).returns<HeadquartersRow[]>()),
     readAll((from, to) => locationsQuery.range(from, to).returns<LocationOptionRow[]>()),
     readAll((from, to) => containersQuery.range(from, to).returns<ContainerOptionRow[]>()),
-    readAll((from, to) => supabase.from("inventory_categories").select("code, name")
-      .order("name").order("code").range(from, to).returns<Array<{ code: string; name: string }>>())
+    categoriesPromise
   ]);
 
   // PostgREST may reject a stale/out-of-range offset before returning its count.
   if (itemsResponse.error?.code === "PGRST103") {
     const countQuery = supabase.from("inventory_items").select("id", { count: "exact", head: true });
     if (q) countQuery.ilike("name", `%${q.replace(/[\\%_*]/g, "\\$&")}%`);
-    if (category) countQuery.eq("category", category);
+    if (category) countQuery.in("category", categoryBranch(category, categoriesResponse.data));
     filterInventoryStatus(countQuery, status, today);
     if (operationalStatus) countQuery.eq("operational_status", operationalStatus);
     if (headquartersFilter) countQuery.eq("headquarters_id", headquartersFilter);
@@ -240,6 +242,11 @@ export default async function InventoryPage({ searchParams }: {
   const failed = failures.filter(([, error]) => error);
   if (failed.length || !itemsResponse.data || itemsResponse.count === null) {
     console.error("Inventory read failed", failed);
+    if (categoriesResponse.error?.message.includes("parent_code")) {
+      return <InventoryError message={isAdmin
+        ? "Falta actualizar las categorías de la base de datos. Ejecuta supabase/upgrade-category-hierarchy.sql en SQL Editor del proyecto Supabase configurado en la aplicación."
+        : "La base de datos necesita una actualización. Contacta con un administrador."} />;
+    }
     if (itemsResponse.error?.code === "42703" && itemsResponse.error.message.includes("operational_status")) {
       return <InventoryError message={isAdmin
         ? "La base de datos no está actualizada: falta el campo de estado operativo. Ejecuta el archivo supabase/upgrade-2026-09-14.sql completo en SQL Editor del mismo proyecto Supabase configurado en la aplicación. Después vuelve a cargar esta página. No uses install.sql sobre la base existente."
@@ -264,7 +271,7 @@ export default async function InventoryPage({ searchParams }: {
   const headquarters = headquartersResponse.data;
   const locations = locationsResponse.data;
   const containers = containersResponse.data;
-  const categories = categoriesResponse.data;
+  const categories = categoryOptions(categoriesResponse.data);
   const locationsById = new Map(locations.map((location) => [location.id, location]));
   const locationPath = (id: string | null) => {
     if (!id) return "Sin ubicación";
@@ -292,7 +299,7 @@ export default async function InventoryPage({ searchParams }: {
     code: template.code,
     name: template.name,
     category: template.category_code,
-    categoryName: template.inventory_categories?.name ?? template.category_code,
+    categoryName: categories.find(category => category.code === template.category_code)?.name ?? template.inventory_categories?.name ?? template.category_code,
     description: template.description ?? "",
     fields: (template.inventory_template_fields ?? [])
       .sort((a, b) => a.sort_order - b.sort_order)
@@ -395,6 +402,7 @@ export default async function InventoryPage({ searchParams }: {
                 {category && !categories.some((entry) => entry.code === category) ? <option value={category}>{category} (no disponible)</option> : null}
                 {categories.map((entry) => <option key={entry.code} value={entry.code}>{entry.name}</option>)}
               </select>
+              <span className="ec-help">Incluye sus subcategorías.</span>
             </label>
             <label className="ec-label">Alerta
               <select className="ec-select" name="status" defaultValue={status}>

@@ -34,6 +34,7 @@ function harness({ role = 'admin', rows = {}, failTable, active = true } = {}) {
     ], ...rows
   };
   const page = load('app/dashboard/inventory/page.tsx', {
+    '@/lib/inventory/categories': load('lib/inventory/categories.ts'),
     '@/lib/inventory/expiry-status': load('lib/inventory/expiry-status.ts'),
     'next/link': ({ children, ...props }) => React.createElement('a', props, children),
     'next/navigation': { redirect: href => { throw Error('REDIRECT:' + href); } },
@@ -127,4 +128,20 @@ test('roles keep site scoping and creation/alert permissions; empty and failed r
     const h = harness({ failTable }); const tree = await h.page(); assert.equal(h.table(tree), undefined); assert.match(renderToStaticMarkup(tree), /No se (han podido|pudo) cargar/);
   }
   const inactive = harness({ active: false }); assert.match(renderToStaticMarkup(await inactive.page()), /Acceso bloqueado/); assert.equal(inactive.calls.length, 0);
+});
+
+test('category filter includes descendants at every depth before pagination, without including siblings', async () => {
+  const h = harness({ rows: {
+    inventory_categories: [
+      { code: 'tool', name: 'Herramientas', parent_code: null },
+      { code: 'drills', name: 'Taladros', parent_code: 'tool' },
+      { code: 'battery', name: 'Bateria', parent_code: 'drills' },
+      { code: 'clothing', name: 'Ropa', parent_code: null }
+    ],
+    inventory_items: [item, { ...item, id: 'battery', category: 'battery' }, { ...item, id: 'jacket', category: 'clothing' }]
+  } });
+  const tree = await h.page({ category: 'tool' });
+  assert.deepEqual(Array.from(h.table(tree).props.rows, row => row.id), ['drill', 'battery']);
+  assert.match(renderToStaticMarkup(tree), /Herramientas \/ Taladros \/ Bateria/);
+  assert.deepEqual(Array.from(h.table(await h.page({ category: 'drills' })).props.rows, row => row.id), ['battery']);
 });

@@ -4,7 +4,7 @@ Aplicación de inventario y logística para una ONG dedicada al rescate, constru
 
 ## Funcionalidad
 
-- Inventario por sede, categorías y fichas configurables, ubicaciones y cajas.
+- Inventario por sede, categorías y subcategorías, fichas configurables, ubicaciones y cajas.
 - Roles, responsables de logística y solicitudes con historial.
 - Movimientos de stock, estado operativo, mantenimiento y caducidad.
 - Documentos privados y enlaces a manuales, QR y alertas por correo.
@@ -12,6 +12,12 @@ Aplicación de inventario y logística para una ONG dedicada al rescate, constru
 - Reparto de existencias por lote entre varias cajas y ubicaciones dentro de cada sede.
 
 ## Actualizar el proyecto existente
+
+Para activar las subcategorías, ejecuta `supabase/upgrade-category-hierarchy.sql` completo en SQL Editor del proyecto Supabase de la aplicación, antes de desplegar este código. Conserva el catálogo existente y registra las migraciones para no repetirlas. No uses `install.sql` sobre una base con datos. Haz una copia de seguridad antes de actualizar.
+
+En **Fichas > Categorías**, el administrador puede elegir una categoría superior al crear o editar. La tabla y los selectores muestran la ruta completa. El filtro del inventario incluye las subcategorías; no se puede eliminar una categoría con subcategorías, fichas o artículos asociados. Los campos siguen siendo configurables por ficha, sin herencia automática entre categorías.
+
+La importación CSV/Excel de existencias, voluntarios y entregas queda pendiente de recibir un archivo de muestra. No se han precreado categorías ni campos de Uniformidad: se definirán según sus columnas y contenido real. Antes de importar habrá que acordar identificadores, tallas, sedes y cómo distinguir stock disponible de material ya entregado para evitar duplicados. Tampoco se han creado cuentas ni enviado invitaciones.
 
 Para el reparto de existencias, el archivo vigente es `supabase/upgrade-distributed-stock.sql`. Conserva las cantidades actuales y actualiza movimientos, cajas, checklists y avisos. Sigue [la guía de existencias repartidas](docs/distributed-stock.md). No se ejecuta automáticamente al arrancar la aplicación.
 
