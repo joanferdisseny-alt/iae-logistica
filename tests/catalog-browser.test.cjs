@@ -103,31 +103,50 @@ function harness({role='admin',active=true,rows={},failTable,failAfterPage,overf
   return {calls,page:params=>page({searchParams:Promise.resolve(params??{})})};
 }
 
-test('catalogue follows the full branch, keeps grouped sizes and opens existing article/QR URLs',async()=>{
-  const h=harness({rows:{inventory_catalog_items:[product,{...product,id:'sibling',category:'second',name:'POLO'}]}});
-  const html=renderToStaticMarkup(await h.page({category:'first'}));
+test('root and intermediate folders show only child categories without querying products',async()=>{
+  for(const category of ['', 'uniformity', 'first']){
+    const h=harness({failTable:'inventory_catalog_items'});
+    const tree=await h.page({category,q:'MONO',page:'8',headquarters:site});
+    const html=renderToStaticMarkup(tree);
+    assert.match(html,/ec-catalog-folder/);assert.match(html,/categoría final/);
+    assert.doesNotMatch(html,/ec-catalog-products|role="status"|Paginación del catálogo|name="q"|No hay artículos|role="alert"/);
+    assert.equal(h.calls.length,2,'Intermediate folders do not count or fetch articles');
+    assert.ok(!h.calls.some(c=>c.table==='inventory_catalog_items'));
+    const folder=all(tree).find(n=>n.props?.className==='ec-catalog-folder');
+    const params=new URL(folder.props.href,'https://local.invalid').searchParams;
+    assert.equal(params.get('q'),null);assert.equal(params.get('page'),null);assert.equal(params.get('headquarters'),site);
+  }
+});
+
+test('leaf folder shows only its own articles, keeps grouped sizes and existing article/QR URLs',async()=>{
+  const h=harness({rows:{inventory_catalog_items:[product,{...product,id:'sibling',category:'second',name:'POLO'},{...product,id:'parent',category:'first',name:'BOLSA'}]}});
+  const html=renderToStaticMarkup(await h.page({category:'overalls'}));
   assert.match(html,/Uniformidad/);assert.match(html,/Primera equipación/);assert.match(html,/Monos/);assert.match(html,/1–1 de 1 artículos/);
-  assert.match(html,/M: 10 · L: 0/);assert.match(html,/href="\/dashboard\/inventory\/mono"/);assert.doesNotMatch(html,/>POLO</);
-  assert.deepEqual(Array.from(h.calls.find(c=>c.table==='inventory_catalog_items').filters.find(f=>f[0]==='in')[2]),['first','overalls']);
+  assert.match(html,/M: 10 · L: 0/);assert.match(html,/href="\/dashboard\/inventory\/mono"/);assert.doesNotMatch(html,/>POLO<|>BOLSA<|ec-catalog-folder/);
+  const query=h.calls.find(c=>c.table==='inventory_catalog_items');
+  assert.ok(query.filters.some(([op,key,value])=>op==='eq'&&key==='category'&&value==='overalls'));
+  assert.ok(!query.filters.some(([op])=>op==='in'));
   assert.equal(h.calls.length,3,'No per-category count, stock, attachment or template queries');
+  const topLevelLeaf=harness({rows:{inventory_catalog_items:[{...product,category:'tools'}]}});
+  assert.match(renderToStaticMarkup(await topLevelLeaf.page({category:'tools'})),/1–1 de 1 artículos/);
 });
 
 test('search and pagination cover every product, retain filters and never load the entire stock catalogue',async()=>{
   const products=Array.from({length:260},(_,i)=>({...product,id:String(i),name:i===259?'Producto especial':'MONO '+i,search_text:i===259?'Producto especial':'MONO '+i}));
   const search=harness({rows:{inventory_catalog_items:products}});
-  const html=renderToStaticMarkup(await search.page({q:'Producto especial'}));
+  const html=renderToStaticMarkup(await search.page({category:'overalls',q:'Producto especial'}));
   assert.match(html,/1–1 de 1 artículos/);assert.match(html,/Producto especial/);
   const h=harness({rows:{inventory_catalog_items:products}});
-  const tree=await h.page({q:'MONO',category:'uniformity',headquarters:site,page:'2'});
+  const tree=await h.page({q:'MONO',category:'overalls',headquarters:site,page:'2'});
   const query=h.calls.find(c=>c.table==='inventory_catalog_items');assert.equal(query.from,50);assert.equal(query.to,99);
   const next=all(tree).find(n=>n.props?.rel==='next').props.href;
   const params=new URL(next,'https://local.invalid').searchParams;
-  assert.deepEqual(Object.fromEntries(params),{category:'uniformity',q:'MONO',headquarters:site,page:'3'});
+  assert.deepEqual(Object.fromEntries(params),{category:'overalls',q:'MONO',headquarters:site,page:'3'});
 });
 
 test('non-admins cannot change site via URL, volunteers cannot enter, and inactive profiles query nothing',async()=>{
   for(const role of ['reader','editor']){
-    const h=harness({role}); const html=renderToStaticMarkup(await h.page({headquarters:foreign}));
+    const h=harness({role}); const html=renderToStaticMarkup(await h.page({category:'overalls',headquarters:foreign}));
     assert.match(html,/1–1 de 1 artículos/);assert.doesNotMatch(html,/Navarra|name="headquarters"/);
     assert.ok(h.calls.find(c=>c.table==='inventory_catalog_items').filters.some(([op,key,value])=>op==='eq'&&key==='headquarters_id'&&value===site));
   }
@@ -141,7 +160,10 @@ test('empty categories are visible and invalid/deleted filters and partial reads
   assert.match(renderToStaticMarkup(await empty.page({category:'empty'})),/Todavía no hay artículos/);
   assert.match(renderToStaticMarkup(await harness().page({category:'deleted'})),/ya no existe/);
   assert.match(renderToStaticMarkup(await harness().page({headquarters:'invalid'})),/no es válida/);
-  for(const failTable of ['inventory_categories','headquarters','inventory_catalog_items'])assert.match(renderToStaticMarkup(await harness({failTable}).page()),/role="alert"/);
+  for(const failTable of ['inventory_categories','headquarters','inventory_catalog_items'])assert.match(renderToStaticMarkup(await harness({failTable}).page({category:'overalls'})),/role="alert"/);
+  const noCategories=harness({rows:{inventory_categories:[]}});
+  assert.match(renderToStaticMarkup(await noCategories.page()),/Todavía no hay categorías creadas/);
+  assert.equal(noCategories.calls.length,2);
   const many=Array.from({length:501},(_,i)=>({code:'category'+i,name:'Categoría '+i,parent_code:null}));
   const complete=harness({rows:{inventory_categories:many}});await complete.page();
   assert.ok(complete.calls.some(c=>c.table==='inventory_categories'&&c.from===500));
@@ -150,14 +172,15 @@ test('empty categories are visible and invalid/deleted filters and partial reads
   assert.ok(!fail.calls.some(c=>c.table==='inventory_catalog_items'));
 });
 
-test('stale page offsets recover the last page using the same search, branch and site',async()=>{
+test('stale page offsets recover the last page using the same search, leaf category and site',async()=>{
   for(const overflow of [false,true]){
     const h=harness({overflow});
-    await assert.rejects(h.page({page:'8',category:'first',q:'MONO',headquarters:site}),error=>{
+    await assert.rejects(h.page({page:'8',category:'overalls',q:'MONO',headquarters:site}),error=>{
       assert.ok(error.message.startsWith('REDIRECT:'));
       const params=new URL(error.message.slice(9),'https://local.invalid').searchParams;
-      assert.equal(params.get('category'),'first');assert.equal(params.get('q'),'MONO');assert.equal(params.get('headquarters'),site);
+      assert.equal(params.get('category'),'overalls');assert.equal(params.get('q'),'MONO');assert.equal(params.get('headquarters'),site);
       assert.equal(params.get('page'),null);return true;
     });
+    for(const query of h.calls.filter(c=>c.table==='inventory_catalog_items'))assert.ok(query.filters.some(([op,key,value])=>op==='eq'&&key==='category'&&value==='overalls'));
   }
 });

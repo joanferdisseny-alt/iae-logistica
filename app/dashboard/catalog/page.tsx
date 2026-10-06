@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireAccess } from "@/lib/auth/context";
 import { readAllRows } from "@/lib/read-all";
-import { categoryBranch, type InventoryCategory } from "@/lib/inventory/categories";
+import type { InventoryCategory } from "@/lib/inventory/categories";
 import { catalogCategoryNodes, catalogHref, type CatalogCategoryNode } from "@/lib/inventory/catalog-browser";
 import { sizeTotals, type SizeVariant } from "@/lib/inventory/size-catalog";
 import { CategoryTree } from "./category-tree";
@@ -29,12 +29,10 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
   const params = await searchParams;
   const param = (key: string) => (Array.isArray(params[key]) ? params[key][0] : params[key])?.trim() ?? "";
   const category = param("category");
-  const q = param("q").slice(0, 120);
   const headquarters = isAdmin ? param("headquarters") : profile.headquarters_id!;
   if (headquarters && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(headquarters)) return <CatalogError message="La sede seleccionada no es válida. Restablece los filtros." />;
   const requested = Number(param("page") || 1);
   const page = Number.isSafeInteger(requested) && requested > 0 && requested <= 42949672 ? requested : 1;
-  const filters = { category, q, headquarters: isAdmin ? headquarters : "" };
   let categories: InventoryCategory[], sites: Site[], nodes: CatalogCategoryNode[];
   try {
     [categories, sites] = await Promise.all([
@@ -52,29 +50,36 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
   const selected = nodes.find(node => node.code === category);
   if (category && !selected) return <CatalogError message="Esta categoría ya no existe o no está disponible. Vuelve al catálogo para elegir otra." />;
   if (headquarters && !sites.some(site => site.id === headquarters)) return <CatalogError message="La sede seleccionada ya no está disponible." />;
-  const branch = category ? categoryBranch(category, categories) : [];
-  const query = (head = false) => {
-    const result = supabase.from("inventory_catalog_items").select(head ? "id" : "id, name, category, headquarters_id, current_stock, unit, status, is_size_group, size_count, variants", { count: "exact", head });
-    if (category) result.in("category", branch);
-    if (headquarters) result.eq("headquarters_id", headquarters);
-    if (q) result.ilike("search_text", `%${q.replace(/[\\%_*]/g, "\\$&")}%`);
-    return result;
-  };
-  const response = await query().order("category").order("name").order("id").range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1).returns<Product[]>();
-  if (response.error?.code === "PGRST103") {
-    const countResponse = await query(true);
-    if (!countResponse.error && countResponse.count !== null) redirect(catalogHref({ ...filters, page: Math.max(1, Math.ceil(countResponse.count / PAGE_SIZE)) }));
+  const showProducts = !!selected && !selected.hasChildren;
+  const q = showProducts ? param("q").slice(0, 120) : "";
+  const filters = { category, q, headquarters: isAdmin ? headquarters : "" };
+  let products: Product[] = [];
+  let total = 0;
+  if (showProducts) {
+    const query = (head = false) => {
+      const result = supabase.from("inventory_catalog_items").select(head ? "id" : "id, name, category, headquarters_id, current_stock, unit, status, is_size_group, size_count, variants", { count: "exact", head })
+        .eq("category", category);
+      if (headquarters) result.eq("headquarters_id", headquarters);
+      if (q) result.ilike("search_text", `%${q.replace(/[\\%_*]/g, "\\$&")}%`);
+      return result;
+    };
+    const response = await query().order("name").order("id").range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1).returns<Product[]>();
+    if (response.error?.code === "PGRST103") {
+      const countResponse = await query(true);
+      if (!countResponse.error && countResponse.count !== null) redirect(catalogHref({ ...filters, page: Math.max(1, Math.ceil(countResponse.count / PAGE_SIZE)) }));
+    }
+    if (response.error || !response.data || response.count === null) return <CatalogError message={isAdmin && ["42P01", "PGRST205"].includes(response.error?.code ?? "")
+      ? "Falta actualizar el catálogo agrupado: ejecuta supabase/upgrade-size-catalog.sql en Supabase. No vuelvas a importar el Excel."
+      : "No se han podido cargar los artículos completos. Vuelve a intentarlo; no se muestran resultados parciales."} />;
+    products = response.data;
+    total = response.count;
   }
-  if (response.error || !response.data || response.count === null) return <CatalogError message={isAdmin && ["42P01", "PGRST205"].includes(response.error?.code ?? "")
-    ? "Falta actualizar el catálogo agrupado: ejecuta supabase/upgrade-size-catalog.sql en Supabase. No vuelvas a importar el Excel."
-    : "No se han podido cargar los artículos completos. Vuelve a intentarlo; no se muestran resultados parciales."} />;
-  const total = response.count;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  if (page > totalPages) redirect(catalogHref({ ...filters, page: totalPages }));
+  if (showProducts && page > totalPages) redirect(catalogHref({ ...filters, page: totalPages }));
   const children = nodes.filter(node => category ? node.parent_code === category : node.ancestors.length === 0);
   const trail = selected ? [...selected.ancestors, selected.code].map(code => nodes.find(node => node.code === code)!) : [];
   const groups = new Map<string, Product[]>();
-  for (const product of response.data) {
+  for (const product of products) {
     const products = groups.get(product.category) ?? [];
     products.push(product); groups.set(product.category, products);
   }
@@ -91,11 +96,11 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
       </div>
       <form className="ec-card-body ec-catalog-filters" method="get" action="/dashboard/catalog">
         {category && <input type="hidden" name="category" value={category} />}
-        <label className="ec-label">Buscar artículos<input className="ec-input" type="search" name="q" defaultValue={q} maxLength={120} placeholder="Nombre de artículo o prenda…" /></label>
+        {showProducts && <label className="ec-label">Buscar en esta categoría<input className="ec-input" type="search" name="q" defaultValue={q} maxLength={120} placeholder="Nombre de artículo o prenda…" /></label>}
         {isAdmin ? <label className="ec-label">Sede<select className="ec-select" name="headquarters" defaultValue={headquarters}>
           <option value="">Todas las sedes</option>{sites.map(site => <option key={site.id} value={site.id}>{site.name}</option>)}
         </select></label> : <p className="ec-help">Sede: {sites[0]?.name ?? "Sede asignada"}</p>}
-        <button className="ec-btn ec-btn-primary" type="submit">Buscar</button>
+        {(showProducts || isAdmin) && <button className="ec-btn ec-btn-primary" type="submit">{showProducts ? "Buscar" : "Aplicar sede"}</button>}
         {(q || (isAdmin && headquarters)) && <Link className="ec-btn" href={catalogHref({ category })}>Limpiar filtros</Link>}
       </form>
     </section>
@@ -110,15 +115,16 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
           <h2 className="ec-h2">{category ? `Dentro de ${selected!.name}` : "Categorías principales"}</h2>
           <div className="ec-catalog-folders">{children.map(child => <Link prefetch={false} className="ec-catalog-folder" key={child.code} href={catalogHref({ ...filters, category: child.code })}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 7V5h6l3 3h9v12H3V7Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" /></svg>
-            <span><strong>{child.name}</strong><small>{child.hasChildren ? "Subcategorías y artículos" : "Ver artículos"}</small></span>
+            <span><strong>{child.name}</strong><small>{child.hasChildren ? "Ver subcategorías" : "Ver artículos"}</small></span>
             <span aria-hidden="true">›</span>
           </Link>)}</div>
         </section>}
-        <div className="ec-col">
-          <h2 className="ec-h2">{selected ? `Artículos de ${selected.name}` : "Todos los artículos"}</h2>
-          <p className="ec-help" role="status">{total ? `${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, total)} de ${total} artículos` : "0 artículos"}{category ? ", incluidas sus subcategorías" : ""}. La búsqueda recorre todo el catálogo accesible, no solo esta página.</p>
-        </div>
-        {!total && <section className="ec-card"><div className="ec-card-body ec-stack">
+        {!showProducts && <p className="ec-help">{nodes.length ? "Abre las carpetas hasta llegar a la categoría final para ver sus artículos." : "Todavía no hay categorías creadas."}</p>}
+        {showProducts && <div className="ec-col">
+          <h2 className="ec-h2">Artículos de {selected!.name}</h2>
+          <p className="ec-help" role="status">{total ? `${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, total)} de ${total} artículos` : "0 artículos"}. La búsqueda recorre todos los artículos de esta categoría, no solo esta página.</p>
+        </div>}
+        {showProducts && !total && <section className="ec-card"><div className="ec-card-body ec-stack">
           <p className="ec-muted">{q ? "No hay artículos que coincidan con esta búsqueda." : "Todavía no hay artículos en esta selección. Las categorías vacías siguen disponibles para organizar el catálogo."}</p>
           <Link className="ec-btn" href={catalogHref({ headquarters: filters.headquarters })}>Ver todo el catálogo</Link>
         </div></section>}
