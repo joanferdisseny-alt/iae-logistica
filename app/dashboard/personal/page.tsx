@@ -18,10 +18,11 @@ export default async function PersonalPage({ searchParams }: { searchParams: Pro
   return <section className="ec-card"><div className="ec-card-header ec-row-wrap"><div><h1 className="ec-h2">Mi material</h1><p className="ec-help">{person?.full_name ?? profile.full_name}{person && ` · ${person.external_code}`}</p></div>
     <CreateRequestModal headquarters={sites} defaultHeadquartersId={profile.headquarters_id} isAdmin={isAdmin} personal />
   </div><div className="ec-card-body ec-stack">
-    {!person ? <p className="ec-help">Tu cuenta todavía no está vinculada a una ficha de voluntario. Administración debe vincularla para mostrar tus entregas. Ya puedes pedir material.</p> :
+    <p className="ec-help">Correo: {user.email} · Sede: {sites.find(s => s.id === profile.headquarters_id)?.name ?? "Sin sede de referencia activa"}</p>
+    {!person ? <p className="ec-error" role="alert">No se ha encontrado tu ficha de voluntario. Administración debe comprobar la actualización de cuentas. Ya puedes pedir material.</p> :
       <div className="ec-table-wrap"><table className="ec-table"><caption>Material entregado y pendiente de devolver</caption><thead><tr><th>Material</th><th>Talla</th><th>Entregado</th><th>Devuelto</th><th>En tu poder</th><th>Fecha</th></tr></thead>
         <tbody>{result?.data?.map(d => <tr key={d.id}><td>{d.material}{d.historical && <span className="ec-help"> · Registro histórico</span>}</td><td>{d.size ?? "—"}</td><td>{d.quantity}</td><td>{d.returned_quantity}</td><td>{d.quantity - d.returned_quantity}</td><td>{d.delivered_on ?? "Sin fecha conocida"}</td></tr>)}</tbody>
-      </table>{!result?.data?.length && <p className="ec-help">No hay entregas registradas en esta página.</p>}</div>}
+      </table>{!result?.data?.length && <p className="ec-help">{page === 1 ? "Todavía no se te ha entregado material." : "No hay entregas en esta página."}</p>}</div>}
     <nav className="ec-row ec-row-wrap" aria-label="Páginas de entregas">{page > 1 && <Link className="ec-btn" href={`/dashboard/personal?page=${page - 1}`}>Anterior</Link>}{page * 30 < (result?.count ?? 0) && <Link className="ec-btn" href={`/dashboard/personal?page=${page + 1}`}>Siguiente</Link>}<Link className="ec-btn" href="/dashboard/requests">Mis solicitudes</Link></nav>
   </div></section>;
 }

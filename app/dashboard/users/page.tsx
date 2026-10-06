@@ -28,7 +28,7 @@ export default async function UsersManagementPage({ searchParams }: {
   }
 
   let query = supabase.from("profiles")
-    .select("id, full_name, is_active, headquarters_id, is_logistics_contact, notification_preferences(notification_email, expiry_warning_days, email_notifications_enabled), app_roles(code, name), headquarters(name)", { count: "exact" })
+    .select("id, full_name, is_active, headquarters_id, is_logistics_contact, notification_preferences(notification_email, expiry_warning_days, email_notifications_enabled), app_roles(code, name), headquarters(name), volunteers(id)", { count: "exact" })
     .order("full_name", { ascending: true, nullsFirst: false }).order("id");
   if (filters.q) query = query.ilike("full_name", `%${escapeUserSearch(filters.q)}%`);
   if (filters.site) query = query.eq("headquarters_id", filters.site);
@@ -44,7 +44,7 @@ export default async function UsersManagementPage({ searchParams }: {
     <section className="ec-card">
       <div className="ec-card-header ec-row-wrap">
         <div className="ec-row ec-row-wrap"><h1 className="ec-h2">Usuarios y permisos</h1><span className="ec-badge ec-badge-neutral">{count}</span></div>
-        <CreateUserModal headquarters={headquarters.filter(site => site.is_active)} roles={roleOptions} />
+        <div className="ec-row ec-row-wrap"><Link className="ec-btn" href="/dashboard/users/import">Importar CSV / Excel</Link><CreateUserModal headquarters={headquarters.filter(site => site.is_active)} roles={roleOptions} /></div>
       </div>
       <div className="ec-card-body">
         <form key={`${filters.q}-${filters.site}-${filters.status}`} method="get" className="ec-user-filters">
@@ -78,6 +78,7 @@ export default async function UsersManagementPage({ searchParams }: {
               <UserContact member={member} />
             </div>
             <div className="ec-actions ec-template-detail-tools">
+              {member.volunteers && <Link className="ec-btn" href={`/dashboard/volunteers/${member.volunteers.id}`}>Ficha y entregas</Link>}
               <EditUserModal key={`${member.id}-${member.app_roles?.code}-${member.headquarters_id}-${member.is_active}-${member.is_logistics_contact}`}
                 member={member} roles={roleOptions} headquarters={headquarters} isSelf={member.id === user.id} />
             </div>

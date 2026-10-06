@@ -22,7 +22,7 @@ test('box return checklists: RLS, frozen contents, saved checks and immutable cl
   for (const id of ids) await db.query("insert into auth.users values($1,$2,'{}')",[id,id+'@example.invalid']);
   const sites=(await db.query('select id from headquarters order by slug limit 2')).rows.map(r=>r.id);
   const [site,otherSite]=sites;
-  await db.query('update profiles set headquarters_id=$1',[site]);
+  await db.query("update profiles set headquarters_id=$1,role_id=(select id from app_roles where code='reader')",[site]);
   await db.query("update profiles set full_name='Responsable',is_logistics_contact=true where id=$1",[contact]);
   await db.query("update profiles set role_id=(select id from app_roles where code='admin') where id=$1",[admin]);
   await db.query('update profiles set headquarters_id=$1 where id=$2',[otherSite,foreign]);

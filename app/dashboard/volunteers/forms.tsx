@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
-import { deliveryPositions, findDeliveryItems, recordDelivery, returnDelivery, saveVolunteer, searchVolunteerProfiles } from "./actions";
+import { deliveryPositions, findDeliveryItems, recordDelivery, returnDelivery, saveVolunteer } from "./actions";
 
 export type Site = { id: string; name: string };
-export type Person = { id: string; external_code: string; full_name: string; email: string | null; headquarters_id: string; profile_id: string | null };
+export type Person = { id: string; external_code: string; full_name: string; email: string | null; headquarters_id: string | null; profile_id: string | null; is_active?: boolean };
 type Result = { error?: string; success?: string; uncertain?: boolean };
 
 function Popup({ title, label, children }: { title: string; label: string; children: ReactNode }) {
@@ -55,7 +55,7 @@ function Operation({ action, children, label }: { action: (data: FormData) => Pr
   </form>;
 }
 
-function Lookup({ site, kind, onSelect }: { site: string; kind: "profile" | "item"; onSelect: (row: { id: string; label: string }) => void }) {
+function Lookup({ site, onSelect }: { site: string; onSelect: (row: { id: string; label: string }) => void }) {
   const [query, setQuery] = useState("");
   const [rows, setRows] = useState<{ id: string; label: string }[]>([]);
   const [message, setMessage] = useState("");
@@ -65,39 +65,37 @@ function Lookup({ site, kind, onSelect }: { site: string; kind: "profile" | "ite
     setRows([]); setMessage("Buscando…");
     const timer = setTimeout(async () => {
       try {
-        const result = kind === "profile" ? await searchVolunteerProfiles(query, site) : await findDeliveryItems(query, site);
+        const result = await findDeliveryItems(query, site);
         if (cancelled) return;
-        setRows(result.rows.map(r => ({ id: r.id, label: "full_name" in r ? `${r.full_name || "Sin nombre"} · ${r.id}` : `${r.name} · ${r.current_stock} uds.` })));
+        setRows(result.rows.map(r => ({ id: r.id, label: `${r.name} · ${r.current_stock} uds.` })));
         setMessage(result.error ?? (result.hasMore ? "Hay más resultados. Concreta la búsqueda." : !result.rows.length ? "Sin resultados." : ""));
       } catch { if (!cancelled) { setRows([]); setMessage("No se pudo completar la búsqueda."); } }
     }, 300);
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [site, kind, query]);
-  return <div className="ec-stack"><label className="ec-label">{kind === "profile" ? "Buscar cuenta de acceso por nombre" : "Buscar artículo y talla"}
+  }, [site, query]);
+  return <div className="ec-stack"><label className="ec-label">Buscar artículo y talla
     <input className="ec-input" value={query} maxLength={100} disabled={!site} onChange={e => setQuery(e.target.value)} placeholder="Escribe al menos 2 letras" /></label>
     <p className="ec-help" role="status">{message}</p>
     {rows.length > 0 && <ul className="ec-stack" style={{ padding: 0, listStyle: "none", maxHeight: 220, overflow: "auto" }}>{rows.map(r => <li key={r.id}><button className="ec-btn" type="button" onClick={() => { onSelect(r); setQuery(""); }}>{r.label}</button></li>)}</ul>}
   </div>;
 }
 
-function PersonFields({ sites, person }: { sites: Site[]; person?: Person }) {
+function PersonFields({ sites, person }: { sites: Site[]; person: Person }) {
   const [site, setSite] = useState(person?.headquarters_id ?? "");
-  const [profile, setProfile] = useState(person?.profile_id ? { id: person.profile_id, label: `Cuenta vinculada: ${person.profile_id}` } : null);
   return <>
     {person && <input type="hidden" name="id" value={person.id} />}
     <div className="ec-form-grid">
       <label className="ec-label">Código de voluntario<input className="ec-input" name="code" required maxLength={80} defaultValue={person?.external_code} /></label>
       <label className="ec-label">Nombre completo<input className="ec-input" name="name" required minLength={2} maxLength={160} defaultValue={person?.full_name} /></label>
-      <label className="ec-label">Correo (opcional)<input className="ec-input" name="email" type="email" maxLength={254} defaultValue={person?.email ?? ""} /></label>
-      <label className="ec-label">Sede<select className="ec-select" name="site" required value={site} onChange={e => { setSite(e.target.value); setProfile(null); }}><option value="">Selecciona sede</option>{sites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
+      <label className="ec-label">Correo de acceso<input className="ec-input" name="email" type="email" readOnly value={person.email ?? ""} /></label>
+      <label className="ec-label">Sede de referencia<select className="ec-select" name="site" value={site} onChange={e => setSite(e.target.value)}><option value="">Sin sede (solo administradores)</option>{sites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
     </div>
-    <input name="profileId" type="hidden" value={profile?.id ?? ""} />
-    <p className="ec-help">La ficha puede crearse sin cuenta. Para dar acceso, crea el usuario en Usuarios con rol Voluntario (acceso personal) y vincúlalo aquí. No se envían invitaciones automáticamente.</p>
-    {profile ? <div className="ec-row ec-row-wrap"><span>{profile.label}</span><button type="button" className="ec-btn" onClick={() => setProfile(null)}>Desvincular cuenta</button></div> : <Lookup site={site} kind="profile" onSelect={setProfile} />}
+    <input name="profileId" type="hidden" value={person.profile_id ?? ""} />
+    <p className="ec-help">Esta ficha y el usuario son la misma persona. El nombre y la sede se actualizan en ambos sitios; el historial de entregas se conserva.</p>
   </>;
 }
-export function VolunteerModal(props: { sites: Site[]; person?: Person }) {
-  return <Popup title={props.person ? "Editar voluntario" : "Nuevo voluntario"} label={props.person ? "Editar" : "Nuevo voluntario"}>
+export function VolunteerModal(props: { sites: Site[]; person: Person }) {
+  return <Popup title="Editar voluntario" label="Editar">
     <Operation action={saveVolunteer} label="Guardar voluntario"><PersonFields {...props} /></Operation>
   </Popup>;
 }
@@ -124,7 +122,7 @@ function DeliveryFields({ person }: { person: Person }) {
     <input type="hidden" name="volunteerId" value={person.id} /><input type="hidden" name="itemId" value={item?.id ?? ""} />
     <label className="ec-label">Tipo de entrega<select className="ec-select" name="mode" value={mode} onChange={e => setMode(e.target.value)}><option value="historical">Histórica: ya estaba entregada</option><option value="issue">Nueva: sale ahora del almacén</option></select></label>
     <p className="ec-help">{mode === "historical" ? "No descuenta stock: el Excel solo incluye lo disponible en almacén." : "Descuenta existencias de la ubicación o caja seleccionada."}</p>
-    {item ? <div className="ec-row ec-row-wrap"><strong>{item.label}</strong><button className="ec-btn" type="button" onClick={() => setItem(null)}>Cambiar artículo</button></div> : <Lookup kind="item" site={person.headquarters_id} onSelect={setItem} />}
+    {item ? <div className="ec-row ec-row-wrap"><strong>{item.label}</strong><button className="ec-btn" type="button" onClick={() => setItem(null)}>Cambiar artículo</button></div> : <Lookup site={person.headquarters_id ?? ""} onSelect={setItem} />}
     <div className="ec-form-grid"><label className="ec-label">Cantidad<input className="ec-input" name="quantity" type="number" required min={1} max={1000000} step={1} defaultValue={1} /></label>
       <label className="ec-label">Fecha de entrega{mode === "historical" ? " (si se conoce)" : ""}<input className="ec-input" type="date" name="date" required={mode === "issue"} /></label></div>
     {mode === "issue" && item && <PositionSelect key={item.id} item={item.id} name="sourceId" outgoing />}
@@ -133,6 +131,7 @@ function DeliveryFields({ person }: { person: Person }) {
   </>;
 }
 export function DeliveryModal({ person }: { person: Person }) {
+  if (!person.headquarters_id) return <p className="ec-help">Asigna una sede de referencia antes de registrar entregas.</p>;
   return <Popup title={`Entregar material a ${person.full_name}`} label="Registrar entrega"><Operation action={recordDelivery} label="Registrar entrega"><DeliveryFields person={person} /></Operation></Popup>;
 }
 export function ReturnModal({ delivery }: { delivery: { id: string; item_id: string; material: string; quantity: number; returned_quantity: number } }) {

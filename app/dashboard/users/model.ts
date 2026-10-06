@@ -11,6 +11,7 @@ export type AdminProfileRow = {
   notification_preferences: { notification_email: string; expiry_warning_days: number; email_notifications_enabled: boolean } | null;
   app_roles: { code: string; name: string } | null;
   headquarters: { name: string } | null;
+  volunteers?: { id: string } | null;
 };
 export const usersPageSize = 25;
 export function parseUserFilters(params: Record<string, string | string[] | undefined>) {

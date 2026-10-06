@@ -119,7 +119,7 @@ test('category mutations refresh their own page and saved recipient preferences 
     const actions = load('app/dashboard/actions.ts', {
       'next/cache': { revalidatePath: path => revalidated.push(path) },
       '@/lib/supabase/server': { createClient: async () => supabase },
-      '@/lib/supabase/admin': { createAdminClient: () => { throw new Error('Unexpected privileged client'); } },
+      '@/lib/members/provision': { provisionMember: () => { throw new Error('Unexpected provisioning'); } },
       '@/lib/auth/context': { requireAccess: async () => ({ isAdmin: true, supabase, user: { id: '11111111-1111-4111-8111-111111111111' } }) },
       '@/lib/inventory/validation': {},
       '@/lib/inventory/product-source': load('lib/inventory/product-source.ts')

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { memberError, provisionMember } from "@/lib/members/provision";
 import { requireAccess } from "@/lib/auth/context";
 import { validateTemplateValues } from "@/lib/inventory/validation";
 import { productSourceSchema, type ProductSource } from "@/lib/inventory/product-source";
@@ -20,9 +20,11 @@ type ActionState = {
 
 const createUserSchema = z.object({
   email: z.string().email("Introduce un email válido."),
-  password: z.string().min(8, "La contraseña debe tener al menos 8 caracteres."),
-  fullName: z.string().min(2, "Indica el nombre del usuario."),
-  roleCode: z.enum(["admin", "editor", "reader", "operator", "viewer", "volunteer"]),
+  requestId: z.string().uuid(),
+  volunteerId: z.string().uuid().optional().or(z.literal("")),
+  code: z.string().max(80),
+  fullName: z.string().min(2, "Indica el nombre del usuario.").max(160),
+  roleCode: z.enum(["admin", "editor", "reader", "volunteer"]),
   headquartersId: z.string().uuid().optional().or(z.literal(""))
 });
 
@@ -250,9 +252,11 @@ export async function createUser(
 
   const parsed = createUserSchema.safeParse({
     email: String(formData.get("email") ?? "").trim(),
-    password: String(formData.get("password") ?? ""),
+    requestId: formData.get("requestId"),
+    volunteerId: formData.get("volunteerId") ?? "",
+    code: String(formData.get("code") ?? "").trim(),
     fullName: String(formData.get("fullName") ?? "").trim(),
-    roleCode: String(formData.get("roleCode") ?? "reader"),
+    roleCode: String(formData.get("roleCode") ?? "volunteer"),
     headquartersId: String(formData.get("headquartersId") ?? "")
   });
 
@@ -260,57 +264,24 @@ export async function createUser(
     return { error: parsed.error.issues[0]?.message ?? "Datos inválidos." };
   }
 
-  const headquartersId =
-    parsed.data.roleCode === "admin" ? null : parsed.data.headquartersId || null;
+  const headquartersId = parsed.data.headquartersId || null;
 
   if (parsed.data.roleCode !== "admin" && !headquartersId) {
     return { error: "Asigna una sede a los usuarios que no sean administradores." };
   }
 
-  const admin = createAdminClient();
-
-  const { data, error } = await admin.auth.admin.createUser({
-    email: parsed.data.email,
-    password: parsed.data.password,
-    email_confirm: true,
-    user_metadata: {
-      full_name: parsed.data.fullName
-    }
-  });
-
-  if (error || !data.user) {
-    return { error: "No se ha podido crear el usuario." };
-  }
-
-  const { data: role } = await admin
-    .from("app_roles")
-    .select("id")
-    .eq("code", parsed.data.roleCode)
-    .maybeSingle<{ id: string }>();
-
-  if (!role) {
-    await admin.auth.admin.deleteUser(data.user.id);
-    return { error: "No se ha encontrado el rol solicitado. Alta cancelada." };
-  }
-
-  const { error: profileError } = await admin
-    .from("profiles")
-    .update({
-      full_name: parsed.data.fullName,
-      is_logistics_contact: parsed.data.roleCode !== "volunteer" && formData.get("isLogisticsContact") === "on",
-      role_id: role.id,
-      headquarters_id: headquartersId
-    })
-    .eq("id", data.user.id);
-
-  if (profileError) {
-    await admin.auth.admin.deleteUser(data.user.id);
-    return { error: "No se pudo asignar el rol. El alta se ha cancelado." };
-  }
-
-  revalidatePath("/dashboard");
-  revalidatePath("/dashboard/users");
-  return { success: "Usuario creado correctamente." };
+  const supabase = await createClient();
+  const p = parsed.data;
+  const prepared = await supabase.rpc("prepare_member_accounts", { p_id: p.requestId, p_filename: "Alta manual", p_rows: [{
+    email: p.email.toLowerCase(), name: p.fullName, site: headquartersId, role: p.roleCode, code: p.code || null,
+    volunteer_id: p.volunteerId || null, logistics: formData.get("isLogisticsContact") === "on"
+  }] });
+  if (prepared.error) return { error: memberError(prepared.error), prepared: !["P0001", "23505", "23514", "22P02", "42501", "PGRST202", "42P01"].includes(prepared.error.code) };
+  const { data: request, error } = await supabase.from("member_provision_requests").select("id").eq("batch_id", p.requestId).single();
+  if (error || !request) return { error: "Alta preparada. Reintenta la misma operación o revísala en Importar usuarios.", prepared: true };
+  const result = await provisionMember(supabase, request.id);
+  revalidatePath("/dashboard", "layout");
+  return { ...result, prepared: true };
 }
 
 export async function updateUserAccess(formData: FormData) {
@@ -351,8 +322,7 @@ export async function updateUserAccess(formData: FormData) {
     return { error: "No se puede completar la operación. Revisa permisos, campos y elementos asociados." };
   }
 
-  const headquartersId =
-    parsed.data.roleCode === "admin" ? null : parsed.data.headquartersId || null;
+  const headquartersId = parsed.data.headquartersId || null;
 
   if (parsed.data.roleCode !== "admin" && !headquartersId) {
     return { error: "No se puede completar la operación. Revisa permisos, campos y elementos asociados." };
@@ -369,6 +339,8 @@ export async function updateUserAccess(formData: FormData) {
 
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/users");
+  revalidatePath("/dashboard/volunteers", "layout");
+  revalidatePath("/dashboard/personal");
   return { success: "Cambios guardados." };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "No se han podido guardar los cambios." };

@@ -18,7 +18,7 @@ test('barcode receiving: atomic distributions, variants, retries, cataloging and
   const [admin,editor,reader,foreign]=Array.from({length:4},()=>randomUUID());
   for(const id of [admin,editor,reader,foreign])await db.query("insert into auth.users values($1,$2,'{}')",[id,id+'@test.invalid']);
   const [site,other]=(await db.query('select id from headquarters order by slug limit 2')).rows.map(r=>r.id);
-  await db.query('update profiles set headquarters_id=$1',[site]);
+  await db.query("update profiles set headquarters_id=$1,role_id=(select id from app_roles where code='reader')",[site]);
   await db.query("update profiles set role_id=(select id from app_roles where code='admin') where id=$1",[admin]);
   await db.query("update profiles set role_id=(select id from app_roles where code='editor') where id=$1",[editor]);
   await db.query('update profiles set headquarters_id=$1 where id=$2',[other,foreign]);

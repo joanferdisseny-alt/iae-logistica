@@ -1,0 +1,5 @@
+SKU;Nombre;Cantidad;Categoria;Subcategoria;Tipo;Unidad;Lote;Caducidad;Marca;Talla
+EJ-BROCA-08;Broca 8 mm;0;Material;Fungibles;Brocas;unidades;;;Ejemplo;
+EJ-TALADRO-01;Taladro;0;Material;Herramientas;Maquinaria;unidades;;;Ejemplo;
+EJ-POLO-M;Polo talla M;0;Uniformidad;Segunda equipacion;Polos;unidades;;;;M
+EJ-PIENSO-01;Pienso;0;Alimentacion;Animales;Piensos;kg;EJEMPLO-1;2027-12-31;;

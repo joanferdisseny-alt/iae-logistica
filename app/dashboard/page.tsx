@@ -32,7 +32,7 @@ export default async function DashboardPage() {
     </section>
     {isAdmin && <section className="ec-card ec-home-admin">
       <div className="ec-col"><h2 className="ec-h2">Administrar el ERP</h2><p className="ec-help">La configuración se mantiene separada del trabajo diario.</p></div>
-      <div className="ec-actions"><Link className="ec-btn" href="/dashboard/imports">Importar stock de uniformidad</Link><Link className="ec-btn" href="/dashboard/templates">Configurar catálogo</Link><Link className="ec-btn" href="/dashboard/users">Usuarios</Link><Link className="ec-btn" href="/dashboard/headquarters">Sedes</Link></div>
+      <div className="ec-actions"><Link className="ec-btn" href="/dashboard/imports">Importar productos y stock</Link><Link className="ec-btn" href="/dashboard/templates">Configurar catálogo</Link><Link className="ec-btn" href="/dashboard/users">Usuarios</Link><Link className="ec-btn" href="/dashboard/headquarters">Sedes</Link></div>
     </section>}
   </div>;
 }

@@ -22,7 +22,7 @@ test('legacy retries preserve provenance while new manual creation uses the orig
   let error = null;
   const query = { select: () => query, eq: () => query, maybeSingle: async () => ({ data: { id, code: 'tool', category_code: 'tool', inventory_template_fields: [{ is_required: true, inventory_fields: { field_key: 'item_name', field_type: 'text', options: [] } }] } }) };
   const actions = load('app/dashboard/actions.ts', {
-    'next/cache': { revalidatePath: () => {} }, '@/lib/supabase/server': {}, '@/lib/supabase/admin': {},
+    'next/cache': { revalidatePath: () => {} }, '@/lib/supabase/server': {}, '@/lib/members/provision': {},
     '@/lib/inventory/product-source': model, '@/lib/inventory/validation': load('lib/inventory/validation.ts'),
     '@/lib/auth/context': { requireAccess: async () => ({ roleCode: 'editor', user: { id }, profile: { headquarters_id: id }, supabase: { from: () => query, rpc: async (name, args) => { calls.push({ name, args }); return { data: error ? null : id, error }; } } }) }
   });

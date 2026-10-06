@@ -112,7 +112,8 @@ test('uniformity and personal portal: atomic imports, deliveries, returns and is
     await assert.rejects(giveBack(randomUUID(),issued,1),/Solo administracion/);
     await assert.rejects(db.query('update volunteer_deliveries set quantity=100 where id=$1',[issued]),/permission denied/);
     await as(other); assert.equal(await scalar('select count(*)::int from volunteer_deliveries'),0);
-    await as(reader); assert.ok(await scalar('select count(*)::int from inventory_items')>0); assert.equal(await scalar('select count(*)::int from volunteers'),0);
+    await as(reader); assert.ok(await scalar('select count(*)::int from inventory_items')>0); assert.equal(await scalar('select count(*)::int from volunteers'),1);
+    assert.equal(await scalar('select profile_id from volunteers'),reader);
   });
   await t.test('volunteer can request material in own site and cancel own request, never manage others or reference hidden stock',async()=>{
     await as(volunteer);

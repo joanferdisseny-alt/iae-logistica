@@ -62,8 +62,8 @@ export function EditUserModal({ member, roles, headquarters, isSelf }: {
                 {!roles.some(option => option.code === initialRole) && <option value={initialRole}>{member.app_roles?.name ?? "Sin rol"}</option>}
                 {roles.map(option => <option key={option.id} value={option.code}>{option.name}</option>)}
               </select></label>
-              <label className="ec-label"><span>Sede</span><select className="ec-select" name="headquartersId" disabled={role === "admin"} required={role !== "admin"}
-                value={role === "admin" ? "" : site} onChange={event => setSite(event.target.value)}>
+              <label className="ec-label"><span>Sede de referencia</span><select className="ec-select" name="headquartersId" required={role !== "admin"}
+                value={site} onChange={event => setSite(event.target.value)}>
                 <option value="">{role === "admin" ? "Todas las sedes" : "Selecciona una sede"}</option>
                 {headquarters.map(site => <option key={site.id} value={site.id} disabled={!site.is_active}>{site.name}{!site.is_active ? " (inactiva)" : ""}</option>)}
               </select></label>
@@ -75,7 +75,7 @@ export function EditUserModal({ member, roles, headquarters, isSelf }: {
               </select></label>}
             </div>
             <p className="ec-help">Los administradores acceden a todas las sedes. Editores y lectores necesitan una sede asignada.</p>
-            {role === "volunteer" && <p className="ec-help">Acceso personal: solo sus entregas y solicitudes. Vincula esta cuenta a su ficha en Voluntarios y entregas.</p>}
+            {role === "volunteer" && <p className="ec-help">Acceso personal: su ficha de voluntario, sus entregas y sus solicitudes. La ficha se vincula automáticamente.</p>}
             <button className="ec-btn ec-btn-primary" type="submit">Guardar cambios</button>
           </div>
         </ActionForm>

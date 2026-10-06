@@ -105,7 +105,7 @@ function actionHarness({ admin = true, error = null, missing = false } = {}) {
     'next/cache': { revalidatePath: path => revalidated.push(path) },
     '@/lib/auth/context': { requireAccess: async () => ({ isAdmin: admin, supabase, user: { id: 'admin' } }) },
     '@/lib/supabase/server': { createClient: async () => supabase },
-    '@/lib/supabase/admin': { createAdminClient: () => { throw Error('Unexpected privileged client'); } },
+    '@/lib/members/provision': { provisionMember: () => { throw Error('Unexpected provisioning'); } },
     '@/lib/inventory/validation': {}, '@/lib/inventory/product-source': load('lib/inventory/product-source.ts')
   });
   return { actions, writes, revalidated };

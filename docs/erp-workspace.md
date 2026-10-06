@@ -19,15 +19,15 @@ Category and type creation suggests a code based on the name, while allowing an 
 
 ## Import workflow
 
-The current stock importer supports **uniformity only**, using its existing XLSX/CSV formats and atomic/idempotent SQL operation. The steps are file, preview, site/destination and result. File analysis stores a draft but does not modify stock. Confirmation still requires acknowledging that quantities exclude clothing already issued. Blank sizes are omitted; explicit zeroes remain available sizes with zero stock.
+The default importer supports general flat CSV/XLSX files. Its steps are file, column mapping and site/destination, then server-validated review and confirmation. It creates missing category paths, article types, fields and articles, or adds stock to identified articles without replacing existing positions. See `docs/inventory-import.md` for the matching rules and migration.
 
-`public/plantilla-uniformidad.csv` is an example structure with fictitious names and zero stock. It is not the NGO inventory. Volunteer and historical-delivery imports remain in the volunteers section; no generic arbitrary-column stock mapper is implied by this redesign.
+`public/plantilla-inventario.csv` provides fictitious examples from several product families, all with zero stock. The old uniformity matrix/CSV loader remains in an expandable secondary section, with its original initial-load semantics: blank sizes are omitted, explicit zeroes remain existing sizes. Volunteer and historical-delivery imports remain in the volunteers section.
 
 ## Performance and safety
 
 The inventory listing no longer fetches templates/fields, the container selector or notification preferences. These are read on opening the respective dialog, with a fresh server-side permission check and complete pagination. Forms are dynamically imported. A failure in a creation-only catalogue no longer prevents reading stock. The normal listing fixture now requires five reads rather than eight (auth excluded; larger catalogues can require additional pages).
 
-Reception and import destination reads run concurrently. Sidebar/context-tab links do not eagerly prefetch every protected page. No shared user-data cache or weaker session verification was introduced. No database migration is required for this workspace change.
+Reception and import destination reads run concurrently. Sidebar/context-tab links do not eagerly prefetch every protected page. No shared user-data cache or weaker session verification was introduced. The workspace redesign itself needs no migration; the general importer requires `supabase/upgrade-inventory-import.sql`.
 
 ## Verification
 

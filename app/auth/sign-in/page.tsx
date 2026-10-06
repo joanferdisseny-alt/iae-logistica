@@ -26,6 +26,10 @@ export default async function SignInPage({
           </p>
 
           <SignInForm next={next} />
+          <div className="ec-row ec-row-wrap">
+            <Link className="ec-link-strong" href="/auth/code?mode=activate">Activar mi cuenta</Link>
+            <Link className="ec-link-strong" href="/auth/code?mode=recover">He olvidado mi contraseña</Link>
+          </div>
           {params.reason ? <p className="ec-error" role="alert">{params.reason === "headquarters" ? "Tu cuenta necesita una sede asignada. Contacta con un administrador." : "Tu cuenta está inactiva o no tiene permisos. Contacta con un administrador."}</p> : null}
 
           <p className="ec-help">

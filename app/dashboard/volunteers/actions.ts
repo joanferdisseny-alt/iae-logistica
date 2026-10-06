@@ -13,27 +13,19 @@ const resultError = (error: { code?: string; message: string }) => error.code ==
     : "No se pudo guardar. Comprueba supabase/upgrade-uniformity.sql y reintenta con los mismos datos.";
 const uncertainError = (error: { code?: string }) => !["P0001", "23502", "23503", "23505", "23514", "42501", "22P02"].includes(error.code ?? "");
 
-export async function searchVolunteerProfiles(query: string, site: string) {
-  const { supabase, isAdmin } = await requireAccess();
-  if (!isAdmin || !uuid.safeParse(site).success || typeof query !== "string" || query.trim().length < 2 || query.length > 100) return { rows: [] };
-  const { data, error } = await supabase.from("profiles").select("id, full_name")
-    .eq("headquarters_id", site).eq("is_active", true).ilike("full_name", `%${query.trim().replace(/[\\%_*]/g, "\\$&")}%`)
-    .order("full_name").order("id").limit(21).returns<{ id: string; full_name: string | null }[]>();
-  return error ? { rows: [], error: "No se pudieron buscar las cuentas." } : { rows: data?.slice(0, 20) ?? [], hasMore: (data?.length ?? 0) > 20 };
-}
-
 export async function saveVolunteer(form: FormData) {
   const { supabase, isAdmin } = await requireAccess();
   if (!isAdmin) return { error: "Solo administradores pueden registrar voluntarios." };
-  const values = z.object({ id: uuid.nullable(), code: z.string().trim().min(1).max(80), name: z.string().trim().min(2).max(160), email: z.string().trim().email().or(z.literal("")), site: uuid, profile: uuid.nullable() })
-    .safeParse({ id: form.get("id") || null, code: form.get("code"), name: form.get("name"), email: form.get("email") ?? "", site: form.get("site"), profile: form.get("profileId") || null });
-  if (!values.success) return { error: "Revisa código, nombre, sede y correo (opcional)." };
+  const values = z.object({ id: uuid, code: z.string().trim().min(1).max(80), name: z.string().trim().min(2).max(160), email: z.string().trim().email().or(z.literal("")), site: uuid.nullable(), profile: uuid })
+    .safeParse({ id: form.get("id"), code: form.get("code"), name: form.get("name"), email: form.get("email") ?? "", site: form.get("site") || null, profile: form.get("profileId") });
+  if (!values.success) return { error: "Revisa código, nombre, sede y cuenta vinculada." };
   const v = values.data;
   const { error } = await supabase.rpc("save_volunteer", { p_id: v.id, p_code: v.code, p_name: v.name, p_email: v.email, p_headquarters_id: v.site, p_profile_id: v.profile });
   if (error) return { error: resultError(error), uncertain: uncertainError(error) };
   revalidatePath("/dashboard/volunteers"); revalidatePath("/dashboard/personal");
+  revalidatePath("/dashboard/users");
   if (v.id) revalidatePath(`/dashboard/volunteers/${v.id}`);
-  return { success: "Ficha de voluntario guardada. Esto no crea cuentas ni envía invitaciones." };
+  return { success: "Ficha y datos de usuario actualizados." };
 }
 
 export async function findDeliveryItems(query: string, site: string) {

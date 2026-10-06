@@ -16,6 +16,8 @@ test('generated installer and repeatable atomic upgrade run on an empty database
   await db.exec(fs.readFileSync('supabase/upgrade-2026-09-15.sql','utf8'));
   await db.exec(fs.readFileSync('supabase/upgrade-category-hierarchy.sql','utf8'));
   const result=await db.query('select * from iae_internal.migrations');
-  assert.equal(result.rows.length,12);
+  await db.exec(fs.readFileSync('supabase/upgrade-inventory-import.sql','utf8'));
+  await db.exec(fs.readFileSync('supabase/upgrade-member-accounts.sql','utf8'));
+  assert.equal(result.rows.length,14);
   assert.equal((await db.query("select public from storage.buckets where id='inventory-documents'")).rows[0].public,false);
 });
