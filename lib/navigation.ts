@@ -3,6 +3,7 @@ export type WorkspaceArea = { id: string; label: string; icon: "box" | "pin" | "
 
 const areas: WorkspaceArea[] = [
   { id: "catalog", label: "Catálogo", icon: "box", links: [
+    { href: "/dashboard/catalog", label: "Explorar catálogo" },
     { href: "/dashboard/inventory", label: "Artículos" },
     { href: "/dashboard/templates/categories", label: "Categorías", adminOnly: true },
     { href: "/dashboard/templates", label: "Tipos de artículo", adminOnly: true },

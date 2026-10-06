@@ -22,7 +22,7 @@ export default async function DashboardPage() {
         <input className="ec-input" id="home-search" name="q" type="search" maxLength={120} placeholder="Buscar un artículo en el inventario…" />
         <button className="ec-btn ec-btn-primary" type="submit">Buscar</button>
       </form>
-      <div className="ec-actions"><Link href="/dashboard/inventory">Ver todo el inventario</Link><Link href="/dashboard/personal">Mi material entregado</Link></div>
+      <div className="ec-actions"><Link href="/dashboard/catalog">Explorar catálogo por categorías</Link><Link href="/dashboard/inventory">Ver todo el inventario</Link><Link href="/dashboard/personal">Mi material entregado</Link></div>
     </section>
     <section aria-labelledby="daily-tasks">
       <h2 className="ec-h2" id="daily-tasks">¿Qué necesitas hacer?</h2>

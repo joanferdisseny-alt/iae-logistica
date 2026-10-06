@@ -17,14 +17,17 @@ const navigation = load('lib/navigation.ts');
 test('four ERP areas preserve every operational route and isolate volunteer navigation', () => {
   const areas = navigation.workspaceAreas('admin');
   assert.deepEqual(Array.from(areas, area => area.id), ['catalog', 'warehouse', 'people', 'settings']);
-  assert.equal(areas.flatMap(area => area.links).length, 14);
+  assert.equal(areas.flatMap(area => area.links).length, 15);
+  assert.equal(areas[0].links[0].href, '/dashboard/catalog');
   const reader = navigation.workspaceAreas('reader');
+  assert.ok(reader[0].links.some(link => link.href === '/dashboard/catalog'));
   assert.ok(reader.flatMap(area => area.links).every(link => !link.adminOnly));
   assert.deepEqual(Array.from(navigation.workspaceAreas('volunteer').flatMap(area => area.links), link => link.href), ['/dashboard/personal', '/dashboard/requests']);
 });
 test('deep item and QR routes activate the right area without changing their URLs', () => {
   const areas = navigation.workspaceAreas('admin');
   for (const [path, selected] of [
+    ['/dashboard/catalog', '/dashboard/catalog'],
     ['/dashboard/inventory/example-id', '/dashboard/inventory'],
     ['/dashboard/stock/position-qr', '/dashboard/inventory'],
     ['/dashboard/locations/physical', '/dashboard/locations/physical'],
