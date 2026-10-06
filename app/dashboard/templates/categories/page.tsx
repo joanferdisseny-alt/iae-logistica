@@ -7,6 +7,7 @@ import {
 } from "@/app/dashboard/templates/forms";
 import { CatalogTable } from "../catalog-table";
 import { categoryBranch, categoryOptions } from "@/lib/inventory/categories";
+import { MoveCategoryModal } from "./move-category-modal";
 
 export const dynamic = "force-dynamic";
 
@@ -45,17 +46,21 @@ export default async function TemplateCategoriesPage() {
           </div>
           <CreateCategoryModal categories={options} />
         </div>
-        <p className="ec-section-intro">Agrupa el catálogo por familias. Una subcategoría es una categoría con otra superior: Uniformidad / Primera equipación.</p>
+        <p className="ec-section-intro">Agrupa el catálogo por familias. Pulsa «Mover» para cambiar una categoría de familia o convertirla en principal, sin perder su contenido.</p>
         <CatalogTable
           searchable
-          columns={[{ label: "Categoría / subcategoría", className: "ec-template-name-column" }, { label: "Código" }]}
-          caption="Selecciona una categoría para ver su descripción o editarla."
+          columns={[{ label: "Categoría / subcategoría", className: "ec-template-name-column" }, { label: "Código" }, { label: "Organizar" }]}
+          caption="Mover cambia la categoría superior. Selecciona el nombre para ver su descripción o editarla."
           emptyMessage="Todavía no hay categorías configuradas. Crea la primera con «Nueva categoría»."
           rows={options.map(option => {
             const category = byCode.get(option.code)!;
             const excludedParents = new Set(categoryBranch(category.code, categories));
+            const parents = options.filter(parent => !excludedParents.has(parent.code));
             return {
-              id: category.code, label: option.name, searchText: category.code, cells: [<code key="code">{category.code}</code>],
+              id: category.code, label: option.name, searchText: category.code, cells: [
+                <code key="code">{category.code}</code>,
+                <MoveCategoryModal key="move" category={category} categories={parents} />
+              ],
               details: <div className="ec-template-detail-heading">
                 <div className="ec-template-description">
                   <h2 className="ec-h3">Descripción</h2>
@@ -65,7 +70,7 @@ export default async function TemplateCategoriesPage() {
                 <div className="ec-actions ec-template-detail-tools">
                   <Link className="ec-btn" href={`/dashboard/inventory?category=${encodeURIComponent(category.code)}`}>Ver artículos</Link>
                   <CreateCategoryModal categories={options} parentCode={category.code} />
-                  <EditCategoryForm category={category} categories={options.filter(parent => !excludedParents.has(parent.code))} />
+                  <EditCategoryForm category={category} categories={parents} />
                 </div>
               </div>
             };

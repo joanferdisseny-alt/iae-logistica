@@ -1350,6 +1350,33 @@ export async function updateInventoryCategory(formData: FormData) {
   }
 }
 
+export async function moveInventoryCategory(formData: FormData) {
+  try {
+    const { supabase } = await requireAdmin();
+    const parsed = z.object({
+      code: z.string().trim().min(2).max(200),
+      parentCode: z.string().trim().max(200).regex(/^[a-z0-9_]*$/, "Categoría superior no válida.")
+    }).safeParse({ code: formData.get("code"), parentCode: formData.get("parentCode") });
+    if (!parsed.success) return { error: "Selecciona la categoría y su nueva categoría superior, o la opción de categoría principal." };
+    if (parsed.data.code === parsed.data.parentCode) return { error: "Una categoría no puede depender de sí misma." };
+
+    // Only change the parent: names, descendants and catalogue references stay intact.
+    // The database trigger rejects cycles even if the user's options are stale.
+    const { data, error } = await supabase.from("inventory_categories")
+      .update({ parent_code: parsed.data.parentCode || null })
+      .eq("code", parsed.data.code).select("code").maybeSingle();
+    if (error) return { error: categoryMutationError(error) };
+    if (!data) return { error: "La categoría ya no existe o no tienes permisos para moverla." };
+
+    revalidatePath("/dashboard", "layout");
+    return { success: parsed.data.parentCode
+      ? "Categoría movida. Conserva sus subcategorías, fichas y artículos."
+      : "Ahora es una categoría principal. Conserva sus subcategorías, fichas y artículos." };
+  } catch {
+    return { error: "No se ha podido mover la categoría. Revisa tus permisos e inténtalo de nuevo." };
+  }
+}
+
 export async function deleteInventoryCategory(formData: FormData) {
   try {
     const { supabase } = await requireAdmin();

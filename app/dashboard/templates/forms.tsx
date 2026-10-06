@@ -66,7 +66,7 @@ function CategoryParentSelect({ categories, value = "" }: { categories: Category
       <option value="">Ninguna (categoría principal)</option>
       {categories.map(category => <option key={category.code} value={category.code}>{category.name}</option>)}
     </select>
-    <span className="ec-help">Selecciona una categoría para crear una subcategoría dentro de ella.</span>
+    <span className="ec-help">Selecciona otra categoría para situarla dentro de ella, o «Ninguna» para que sea principal. Conserva sus fichas, artículos y subcategorías.</span>
   </label>;
 }
 

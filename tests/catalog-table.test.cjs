@@ -76,6 +76,7 @@ for (const kind of ['fields', 'categories']) {
       '@/lib/inventory/categories': load('lib/inventory/categories.ts'),
       'next/navigation': { redirect: () => { throw new Error('REDIRECT'); } },
       '@/app/dashboard/templates/forms': { CreateFieldCatalogModal: empty, EditFieldForm: empty, CreateCategoryModal: empty, EditCategoryForm: empty },
+      './move-category-modal': { MoveCategoryModal: empty },
       '@/app/dashboard/templates/special-keys-modal': { SpecialKeysModal: empty },
       '@/app/dashboard/templates/subnav': { TemplatesSubnav: empty },
       '../catalog-table': { CatalogTable: empty }
