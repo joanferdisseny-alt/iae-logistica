@@ -20,12 +20,12 @@ export default async function ReceivingPage() {
   const canCreate=["admin","editor","operator"].includes(roleCode);
   if(canCreate) for(let from=0;;from+=500) {
     const {data,error}=await supabase.from("inventory_templates")
-      .select("id, code, name, description, category_code, inventory_template_fields(is_required, sort_order, inventory_fields(field_key, label, field_type, options))")
+      .select("id, code, name, description, category_code, inventory_template_fields(is_required, allowed_options, sort_order, inventory_fields(field_key, label, field_type, options))")
       .order("name").order("id").range(from,from+499)
-      .returns<Array<{id:string;code:string;name:string;description:string|null;category_code:string;inventory_template_fields:Array<{is_required:boolean;sort_order:number;inventory_fields:{field_key:string;label:string;field_type:TemplateFieldType;options:string[]}|null}>}>>();
+      .returns<Array<{id:string;code:string;name:string;description:string|null;category_code:string;inventory_template_fields:Array<{is_required:boolean;allowed_options:string[]|null;sort_order:number;inventory_fields:{field_key:string;label:string;field_type:TemplateFieldType;options:string[]}|null}>}>>();
     if(error||!data) return <p className="ec-error">No se pudo cargar el catálogo de fichas. Vuelve a cargar la página.</p>;
     templates.push(...data.map(t=>({id:t.id,code:t.code,name:t.name,description:t.description??"",category:t.category_code,
-      fields:t.inventory_template_fields.sort((a,b)=>a.sort_order-b.sort_order).flatMap(f=>f.inventory_fields?[{key:f.inventory_fields.field_key,label:f.inventory_fields.label,type:f.inventory_fields.field_type,options:f.inventory_fields.options,required:f.is_required}]:[])})));
+      fields:t.inventory_template_fields.sort((a,b)=>a.sort_order-b.sort_order).flatMap(f=>f.inventory_fields?[{key:f.inventory_fields.field_key,label:f.inventory_fields.label,type:f.inventory_fields.field_type,options:f.inventory_fields.options.filter(o=>!f.allowed_options||f.allowed_options.includes(o)),required:f.is_required}]:[])})));
     if(data.length<500)break;
   }
   return <Receiving sites={sites} locations={locations} containers={containers} templates={templates} isAdmin={isAdmin} canCreate={canCreate} initialSite={profile.headquarters_id??sites[0]?.id??""}/>;

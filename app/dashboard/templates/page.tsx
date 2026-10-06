@@ -14,7 +14,7 @@ type TemplateRow = {
   id: string; code: string; name: string; description: string | null; category_code: string;
   inventory_categories: { name: string } | null;
   inventory_template_fields: Array<{
-    id: string; is_required: boolean; sort_order: number;
+    id: string; is_required: boolean; sort_order: number; allowed_options: string[] | null;
     inventory_fields: {
       id: string; field_key: string; label: string;
       field_type: "text" | "number" | "date" | "textarea" | "select" | "boolean";
@@ -41,7 +41,7 @@ export default async function TemplatesPage() {
   const [categories, templates, fields] = await Promise.all([
     readCatalog((from, to) => supabase.from("inventory_categories").select("code, name, parent_code").order("name").order("code").range(from, to).returns<CategoryRow[]>()),
     readCatalog((from, to) => supabase.from("inventory_templates")
-      .select("id, code, name, description, category_code, inventory_categories(name), inventory_template_fields(id, is_required, sort_order, inventory_fields(id, field_key, label, field_type, options))")
+      .select("id, code, name, description, category_code, inventory_categories(name), inventory_template_fields(id, is_required, sort_order, allowed_options, inventory_fields(id, field_key, label, field_type, options))")
       .order("name").order("id").range(from, to).returns<TemplateRow[]>()),
     readCatalog((from, to) => supabase.from("inventory_fields").select("id, field_key, label").order("label").order("id").range(from, to).returns<FieldCatalogRow[]>())
   ]);
@@ -97,6 +97,7 @@ export default async function TemplatesPage() {
                     {assignment.inventory_fields!.field_key} · {fieldTypeLabels[assignment.inventory_fields!.field_type]}
                     {assignment.is_required ? " · obligatorio" : ""}
                   </span>
+                  {assignment.allowed_options && <span>Opciones de esta ficha: {assignment.allowed_options.join(", ")}</span>}
                 </div>
                 <RemoveTemplateFieldForm assignmentId={assignment.id} />
               </div>)}

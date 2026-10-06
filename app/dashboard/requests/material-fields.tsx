@@ -52,13 +52,13 @@ function ArticleSearch({ headquartersId, onSelect }: {
   </div>;
 }
 
-export function RequestMaterialFields({ headquartersId }: { headquartersId: string }) {
+export function RequestMaterialFields({ headquartersId, personal = false }: { headquartersId: string; personal?: boolean }) {
   const [selected, setSelected] = useState<RequestArticle | null>(null);
   const [material, setMaterial] = useState("");
   const [unit, setUnit] = useState("unidades");
   return <>
     <input type="hidden" name="itemId" value={selected?.id ?? ""} />
-    {selected ? <div className="ec-row ec-row-between ec-row-wrap">
+    {personal ? <p className="ec-help">Indica la prenda o material y la talla que necesitas. Logística revisará tu solicitud.</p> : selected ? <div className="ec-row ec-row-between ec-row-wrap">
       <span className="ec-help" role="status">Artículo vinculado: {selected.name}</span>
       <button type="button" className="ec-btn" onClick={() => { setSelected(null); setMaterial(""); setUnit("unidades"); }}>Cambiar / quitar</button>
     </div> : <ArticleSearch headquartersId={headquartersId} onSelect={(article) => {

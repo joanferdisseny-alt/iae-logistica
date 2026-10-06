@@ -38,9 +38,7 @@ function harness(options = {}) {
     async single() { return { data: { id: requestId }, error: options.error }; },
     async maybeSingle() { return { data: options.stale ? null : { id: requestId }, error: options.error }; }
   };
-  const actions = load("actions.ts", {
-    "./model": model,
-    "@/lib/auth/context": { requireAccess: async () => {
+  const access = async () => {
       if (options.inactive) throw new Error("INACTIVE");
       return { supabase: { from: (table) => {
         reads.push(table);
@@ -48,8 +46,11 @@ function harness(options = {}) {
           async maybeSingle() { return { data: options.item ?? null, error: options.error }; }
         };
         return builder;
-      } }, isAdmin: options.isAdmin ?? false, profile: { headquarters_id: options.noSite ? null : site } };
-    } },
+      } }, roleCode: options.roleCode ?? 'reader', isAdmin: options.isAdmin ?? false, profile: { headquarters_id: options.noSite ? null : site } };
+    };
+  const actions = load("actions.ts", {
+    "./model": model,
+    "@/lib/auth/context": { requireAccess: access, requirePersonalAccess: access },
     "next/cache": { revalidatePath: (value) => paths.push(value) },
     "next/navigation": { redirect: (value) => { throw new Error(`REDIRECT:${value}`); } }
   });
@@ -89,6 +90,13 @@ test("non-admin creation ignores forged site and author; admin can choose anothe
     assert.equal(h.writes[0].quantity, 1.125);
     assert.deepEqual(h.paths, ["/dashboard/requests"]);
   }
+});
+test('personal role can request free-text material in own site but cannot reference internal stock',async()=>{
+  const h=harness({roleCode:'volunteer'});
+  assert.ok((await h.actions.createRequest({},form({itemId:requestId}))).error);
+  assert.equal(h.writes.length,0);
+  await assert.rejects(h.actions.createRequest({},form({headquartersId:otherSite})),/REDIRECT/);
+  assert.equal(h.writes[0].headquarters_id,site);
 });
 
 test("invalid input and inactive sessions cannot write", async () => {

@@ -22,13 +22,13 @@ const createUserSchema = z.object({
   email: z.string().email("Introduce un email válido."),
   password: z.string().min(8, "La contraseña debe tener al menos 8 caracteres."),
   fullName: z.string().min(2, "Indica el nombre del usuario."),
-  roleCode: z.enum(["admin", "editor", "reader", "operator", "viewer"]),
+  roleCode: z.enum(["admin", "editor", "reader", "operator", "viewer", "volunteer"]),
   headquartersId: z.string().uuid().optional().or(z.literal(""))
 });
 
 const updateRoleSchema = z.object({
   profileId: z.string().uuid(),
-  roleCode: z.enum(["admin", "editor", "reader", "operator", "viewer"]),
+  roleCode: z.enum(["admin", "editor", "reader", "operator", "viewer", "volunteer"]),
   isActive: z.enum(["true", "false"]),
   headquartersId: z.string().uuid().optional().or(z.literal(""))
 });
@@ -297,7 +297,7 @@ export async function createUser(
     .from("profiles")
     .update({
       full_name: parsed.data.fullName,
-      is_logistics_contact: formData.get("isLogisticsContact") === "on",
+      is_logistics_contact: parsed.data.roleCode !== "volunteer" && formData.get("isLogisticsContact") === "on",
       role_id: role.id,
       headquarters_id: headquartersId
     })
@@ -361,7 +361,7 @@ export async function updateUserAccess(formData: FormData) {
   await checkedMutation(supabase.from("profiles")
     .update({
       role_id: role.id,
-      ...(formData.has("isLogisticsContact") ? { is_logistics_contact: formData.get("isLogisticsContact") === "true" } : {}),
+      ...(parsed.data.roleCode === "volunteer" ? { is_logistics_contact: false } : formData.has("isLogisticsContact") ? { is_logistics_contact: formData.get("isLogisticsContact") === "true" } : {}),
       is_active: parsed.data.isActive === "true",
       headquarters_id: headquartersId
     })
@@ -418,9 +418,9 @@ export async function createInventoryItem(
   }
   const { data: templateRow } = await managerContext.supabase
     .from("inventory_templates")
-    .select("id, code, category_code, inventory_template_fields(is_required, inventory_fields(field_key, field_type, options))")
+    .select("id, code, category_code, inventory_template_fields(is_required, allowed_options, inventory_fields(field_key, field_type, options))")
     .eq("code", parsed.data.templateCode)
-    .maybeSingle<{ id: string; code: string; category_code: string; inventory_template_fields: Array<{ is_required: boolean; inventory_fields: { field_key: string; field_type: string; options: string[] } | null }> }>();
+    .maybeSingle<{ id: string; code: string; category_code: string; inventory_template_fields: Array<{ is_required: boolean; allowed_options: string[] | null; inventory_fields: { field_key: string; field_type: string; options: string[] } | null }> }>();
 
   if (!templateRow) {
     return { error: "La ficha seleccionada no existe." };

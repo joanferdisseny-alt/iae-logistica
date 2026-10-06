@@ -22,6 +22,7 @@ type NavItem = {
 
 const navItems: NavItem[] = [
   { href: "/dashboard", label: "Resumen", icon: "home" },
+  { href: "/dashboard/personal", label: "Mi material", icon: "users" },
   { href: "/dashboard/inventory", label: "Inventario", icon: "box" },
   { href: "/dashboard/locations", label: "Ubicaciones", icon: "pin" },
   { href: "/dashboard/requests", label: "Solicitudes", icon: "box" },
@@ -29,7 +30,9 @@ const navItems: NavItem[] = [
   { href: "/dashboard/receiving", label: "Recepción", icon: "box" },
   { href: "/dashboard/templates", label: "Fichas", icon: "template", adminOnly: true },
   { href: "/dashboard/headquarters", label: "Sedes", icon: "building", adminOnly: true },
-  { href: "/dashboard/users", label: "Usuarios", icon: "users", adminOnly: true }
+  { href: "/dashboard/users", label: "Usuarios", icon: "users", adminOnly: true },
+  { href: "/dashboard/volunteers", label: "Voluntarios y entregas", icon: "users", adminOnly: true },
+  { href: "/dashboard/imports", label: "Importar uniformidad", icon: "template", adminOnly: true }
 ];
 
 function NavIcon({ name }: { name: NavItem["icon"] }) {
@@ -104,7 +107,9 @@ export function DashboardShell({
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuCollapsed, setMenuCollapsed] = useState(false);
-  const visibleItems = navItems.filter((item) => !item.adminOnly || roleCode === "admin");
+  const visibleItems = navItems.filter((item) => roleCode === "volunteer"
+    ? ["/dashboard/personal", "/dashboard/requests"].includes(item.href)
+    : !item.adminOnly || roleCode === "admin");
   const currentItem =
     visibleItems.find(
       (item) => pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(`${item.href}/`))

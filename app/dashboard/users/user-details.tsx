@@ -70,11 +70,12 @@ export function EditUserModal({ member, roles, headquarters, isSelf }: {
               <label className="ec-label"><span>Estado</span><select className="ec-select" name="isActive" defaultValue={String(member.is_active)}>
                 <option value="true">Activo</option><option value="false" disabled={isSelf}>Inactivo</option>
               </select></label>
-              <label className="ec-label"><span>Responsable de logística</span><select className="ec-select" name="isLogisticsContact" defaultValue={String(member.is_logistics_contact)}>
+              {role !== "volunteer" && <label className="ec-label"><span>Responsable de logística</span><select className="ec-select" name="isLogisticsContact" defaultValue={String(member.is_logistics_contact)}>
                 <option value="false">No</option><option value="true">Sí</option>
-              </select></label>
+              </select></label>}
             </div>
             <p className="ec-help">Los administradores acceden a todas las sedes. Editores y lectores necesitan una sede asignada.</p>
+            {role === "volunteer" && <p className="ec-help">Acceso personal: solo sus entregas y solicitudes. Vincula esta cuenta a su ficha en Voluntarios y entregas.</p>}
             <button className="ec-btn ec-btn-primary" type="submit">Guardar cambios</button>
           </div>
         </ActionForm>

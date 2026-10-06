@@ -38,7 +38,7 @@ export default async function UsersManagementPage({ searchParams }: {
   if (error || !members || count === null) throw new Error("No se pueden cargar los usuarios. Vuelve a intentarlo.");
   const lastPage = Math.max(1, Math.ceil(count / usersPageSize));
   if (filters.page > lastPage) redirect(userListHref(filters, lastPage));
-  const roleOptions = roles.filter(role => ["admin", "editor", "reader"].includes(role.code));
+  const roleOptions = roles.filter(role => ["admin", "editor", "reader", "volunteer"].includes(role.code));
 
   return <div className="ec-page">
     <section className="ec-card">

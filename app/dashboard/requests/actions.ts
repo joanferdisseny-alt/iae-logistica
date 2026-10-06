@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireAccess } from "@/lib/auth/context";
+import { requireAccess, requirePersonalAccess } from "@/lib/auth/context";
 import { z } from "zod";
 import { changeStatusSchema, createRequestSchema, type RequestActionState, type RequestArticle } from "./model";
 
@@ -25,7 +25,8 @@ export async function searchRequestArticles(query: string, headquartersId: strin
 }
 
 export async function createRequest(_previous: RequestActionState, formData: FormData): Promise<RequestActionState> {
-  const { supabase, profile, isAdmin } = await requireAccess();
+  const { supabase, profile, isAdmin, roleCode } = await requirePersonalAccess();
+  if (roleCode === "volunteer" && formData.get("itemId")) return { error: "Indica el material y la talla en la solicitud personal, sin enlazar el inventario interno." };
   const parsed = createRequestSchema.safeParse({
     headquartersId: isAdmin ? formData.get("headquartersId") : profile.headquarters_id,
     itemId: formData.get("itemId") || null,
@@ -54,7 +55,7 @@ export async function createRequest(_previous: RequestActionState, formData: For
 }
 
 export async function changeRequestStatus(_previous: RequestActionState, formData: FormData): Promise<RequestActionState> {
-  const { supabase } = await requireAccess();
+  const { supabase } = await requirePersonalAccess();
   const parsed = changeStatusSchema.safeParse({
     requestId: formData.get("requestId"), expectedStatus: formData.get("expectedStatus"),
     status: formData.get("status")

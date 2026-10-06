@@ -69,6 +69,7 @@ type TemplateRow = {
   } | null;
   inventory_template_fields: Array<{
     is_required: boolean;
+    allowed_options: string[] | null;
     sort_order: number;
     inventory_fields: {
       field_key: string;
@@ -209,7 +210,7 @@ export default async function InventoryPage({ searchParams }: {
     readAll((from, to) => supabase
       .from("inventory_templates")
       .select(
-        "id, code, name, description, category_code, inventory_categories(name), inventory_template_fields(is_required, sort_order, inventory_fields(field_key, label, field_type, options))"
+        "id, code, name, description, category_code, inventory_categories(name), inventory_template_fields(is_required, allowed_options, sort_order, inventory_fields(field_key, label, field_type, options))"
       )
       .order("name", { ascending: true }).order("id").range(from, to)
       .returns<TemplateRow[]>()),
@@ -309,7 +310,7 @@ export default async function InventoryPage({ searchParams }: {
         label: field.inventory_fields?.label ?? "",
         type: field.inventory_fields?.field_type ?? "text",
         required: field.is_required,
-        options: field.inventory_fields?.options ?? []
+        options: (field.inventory_fields?.options ?? []).filter(option => !field.allowed_options || field.allowed_options.includes(option))
       }))
   }));
 

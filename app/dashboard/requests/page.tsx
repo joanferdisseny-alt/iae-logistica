@@ -9,7 +9,7 @@ const pageSize = 30;
 export default async function RequestsPage({ searchParams }: {
   searchParams: Promise<{ status?: string; page?: string }>;
 }) {
-  const { supabase, profile, isAdmin, isLogisticsContact } = await requireRequestAccess();
+  const { supabase, profile, isAdmin, isLogisticsContact, roleCode } = await requireRequestAccess();
   const params = await searchParams;
   const status = requestStatuses.includes(params.status as RequestStatus) ? params.status as RequestStatus : undefined;
   const rawPage = Number(params.page ?? 1);
@@ -31,7 +31,7 @@ export default async function RequestsPage({ searchParams }: {
           <h1 className="ec-h1">Solicitudes de material</h1>
           <p className="ec-help">{isAdmin ? "Todas las sedes" : isLogisticsContact ? "Gestion de tu sede" : "Mis solicitudes"}</p>
         </div>
-        <CreateRequestModal headquarters={headquarters ?? []} defaultHeadquartersId={profile.headquarters_id} isAdmin={isAdmin} />
+        <CreateRequestModal headquarters={headquarters ?? []} defaultHeadquartersId={profile.headquarters_id} isAdmin={isAdmin} personal={roleCode === "volunteer"} />
       </div>
       <div className="ec-card-body ec-stack">
         <div className="ec-row ec-row-wrap">
@@ -57,7 +57,7 @@ export default async function RequestsPage({ searchParams }: {
               <thead><tr><th scope="col">Material</th><th scope="col">Cantidad</th><th scope="col">Sede</th><th scope="col">Estado</th><th scope="col">Actualizada</th></tr></thead>
               <tbody>{requests?.map((request) => <tr key={request.id}>
                 <td><Link href={`/dashboard/requests/${request.id}`}>{request.material}</Link>
-                  {request.item_id && <div><Link className="ec-help" href={`/dashboard/inventory/${request.item_id}`}>Ver artículo</Link></div>}
+                  {request.item_id && roleCode !== "volunteer" && <div><Link className="ec-help" href={`/dashboard/inventory/${request.item_id}`}>Ver artículo</Link></div>}
                 </td>
                 <td>{request.quantity} {request.unit}</td>
                 <td>{request.headquarters?.name ?? "Sede no disponible"}</td>

@@ -91,7 +91,8 @@ export function CreateUserForm({
         </select>
       </label>
 
-      <label className="ec-checkbox"><input type="checkbox" name="isLogisticsContact" />Responsable de logística (recibe y gestiona solicitudes de su sede)</label>
+      {selectedRole === "volunteer" ? <p className="ec-help">Acceso limitado a su material y sus solicitudes. Vincula después esta cuenta en Voluntarios y entregas.</p>
+        : <label className="ec-checkbox"><input type="checkbox" name="isLogisticsContact" />Responsable de logística (recibe y gestiona solicitudes de su sede)</label>}
       {state?.error ? <p className="ec-error">{state.error}</p> : null}
       {state?.success ? <p className="ec-success">{state.success}</p> : null}
 

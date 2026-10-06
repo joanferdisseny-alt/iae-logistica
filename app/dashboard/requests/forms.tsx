@@ -5,10 +5,11 @@ import { RequestMaterialFields } from "./material-fields";
 import { changeRequestStatus, createRequest } from "./actions";
 import { statusLabels, type RequestStatus } from "./model";
 
-export function CreateRequestModal({ headquarters, defaultHeadquartersId, isAdmin }: {
+export function CreateRequestModal({ headquarters, defaultHeadquartersId, isAdmin, personal = false }: {
   headquarters: { id: string; name: string }[];
   defaultHeadquartersId: string | null;
   isAdmin: boolean;
+  personal?: boolean;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const opener = useRef<HTMLButtonElement>(null);
@@ -35,7 +36,7 @@ export function CreateRequestModal({ headquarters, defaultHeadquartersId, isAdmi
             {headquarters.map((h) => <option key={h.id} value={h.id}>{h.name}</option>)}
           </select>
         </label>
-        <RequestMaterialFields key={headquartersId} headquartersId={headquartersId} />
+        <RequestMaterialFields key={headquartersId} headquartersId={headquartersId} personal={personal} />
         <label className="ec-label"><span>Notas (opcional)</span>
           <textarea className="ec-textarea" name="notes" maxLength={2000} rows={3} />
         </label>

@@ -8,7 +8,7 @@ import { allowedStatuses, formatRequestDate, statusClasses, statusLabels, type R
 export const dynamic = "force-dynamic";
 
 export default async function RequestPage({ params }: { params: Promise<{ requestId: string }> }) {
-  const { supabase, user, profile, isAdmin, isLogisticsContact } = await requireRequestAccess();
+  const { supabase, user, profile, isAdmin, isLogisticsContact, roleCode } = await requireRequestAccess();
   const { requestId } = await params;
   if (!z.string().uuid().safeParse(requestId).success) notFound();
   const { data: request, error } = await supabase.from("logistics_requests")
@@ -35,7 +35,7 @@ export default async function RequestPage({ params }: { params: Promise<{ reques
           <span>{request.headquarters?.name ?? "Sede no disponible"}</span>
         </div>
         <p className="ec-help">Creada: {formatRequestDate(request.created_at)}. Actualizada: {formatRequestDate(request.updated_at)}.</p>
-        {request.item_id && <div><Link className="ec-btn" href={`/dashboard/inventory/${request.item_id}`}>Ver ficha del artículo referenciado</Link></div>}
+        {request.item_id && roleCode !== "volunteer" && <div><Link className="ec-btn" href={`/dashboard/inventory/${request.item_id}`}>Ver ficha del artículo referenciado</Link></div>}
         <p className="ec-help" style={{ overflowWrap: "anywhere" }}>Solicitante: {request.created_by === user.id ? "Tu" : request.created_by}</p>
         {request.notes && <p style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{request.notes}</p>}
         <RequestStatusForm requestId={request.id} status={request.status} options={options} />
