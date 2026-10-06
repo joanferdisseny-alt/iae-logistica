@@ -60,10 +60,12 @@ function harness(options = {}) {
         eq(...args) { query.filters.push(["eq", ...args]); return builder; },
         neq(...args) { query.filters.push(["neq", ...args]); return builder; },
         in(...args) { query.filters.push(["in", ...args]); return builder; },
+        contains(...args) { query.filters.push(["contains", ...args]); return builder; },
         or(...args) { query.filters.push(["or", ...args]); return builder; },
         order() { return builder; },
         range(...args) { query.range = args; return builder; },
         async maybeSingle() {
+          if (table === "inventory_catalog_items") return { data: { ...item, is_size_group: false, size_count: 0, variants: [] }, error: null };
           return { data: table === "inventory_items" && !options.missingItem ? item : null, error: null };
         },
         async returns() {
@@ -99,6 +101,7 @@ function harness(options = {}) {
     ...mocks,
     "@/lib/inventory/expiry-status": load("lib/inventory/expiry-status.ts", {}),
     "@/lib/inventory/product-source": load("lib/inventory/product-source.ts", {}),
+    "../size-summary": { SizeSummary: () => null },
     "next/navigation": { notFound: () => { throw new Error("NOT_FOUND"); } },
     "next/link": ({ children }) => children,
     "@/app/dashboard/inventory/add-relation-form": { AddRelationForm: ({ options }) => `RELATION_OPTIONS:${options.length}` },

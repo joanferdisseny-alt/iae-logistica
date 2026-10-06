@@ -66,7 +66,7 @@ export function parseUniformitySheets(sheets: { sheet: string; data: unknown[][]
       uniformitySizes.forEach((size, i) => append(section!, row[0], size, row[i + 1], `${sheet.sheet}!${String.fromCharCode(66 + i)}${index + 1}`));
     }
   }
-  if (!rows.length || rows.length > 2000) throw Error("La importación debe contener entre 1 y 2000 artículos con cantidad confirmada.");
+  if (!rows.length || rows.length > 2000) throw Error("La importación debe contener entre 1 y 2000 variantes de talla con cantidad confirmada.");
   rows.sort((a, b) => `${a.section}|${a.garment}|${a.size}`.localeCompare(`${b.section}|${b.garment}|${b.size}`, "es"));
   return { rows, omitted, garments: new Set(rows.map(r => `${r.section}|${r.garment}`)).size, total: rows.reduce((sum, row) => sum + row.quantity, 0) };
 }

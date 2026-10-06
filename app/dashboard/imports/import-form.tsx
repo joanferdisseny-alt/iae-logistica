@@ -51,7 +51,7 @@ export function UniformityImportForm(props: { sites: { id: string; name: string 
   return <div className="ec-stack">
     <ol className="ec-import-steps" aria-label="Pasos de la importación">{["Archivo", "Revisión", "Sede y destino", "Resultado"].map((label, index) => <li key={label} aria-current={step === index ? "step" : undefined} className={step > index ? "is-complete" : ""}><span>{index + 1}</span>{label}</li>)}</ol>
     {step === 0 && <section className="ec-import-upload ec-stack">
-    <div><h2 className="ec-h2">Carga inicial de uniformidad</h2><p className="ec-muted">El archivo creará las categorías, los tipos de prenda y los artículos por talla. Primero podrás revisarlo: todavía no se modifica el inventario.</p></div>
+    <div><h2 className="ec-h2">Carga inicial de uniformidad</h2><p className="ec-muted">El archivo creará las categorías y una ficha por prenda, con sus tallas y cantidades dentro. Primero podrás revisarlo: todavía no se modifica el inventario.</p></div>
     <form action={action} className="ec-stack">
       <label className="ec-label">Excel de uniformidad / CSV<input className="ec-input" name="file" type="file" accept=".xlsx,.csv" required disabled={pending} /></label>
       <div className="ec-actions"><button type="submit" className="ec-btn ec-btn-primary" disabled={pending}>{pending ? "Analizando…" : "Continuar: revisar archivo"}</button><a className="ec-btn" href="/plantilla-uniformidad.csv" download>Descargar ejemplo CSV</a></div>
@@ -63,7 +63,7 @@ export function UniformityImportForm(props: { sites: { id: string; name: string 
     {state.error && <p className="ec-error" role="alert">{state.error}</p>}
     </section>}
     {step > 0 && state.preview && state.draftId && <>
-      <div className="ec-row ec-row-wrap"><strong>{state.filename}</strong><span className="ec-badge ec-badge-neutral">{state.preview.garments} tipos de prenda</span><span>{state.preview.rows.length} artículos por talla · {state.preview.total} unidades</span></div>
+      <div className="ec-row ec-row-wrap"><strong>{state.filename}</strong><span className="ec-badge ec-badge-neutral">{state.preview.garments} fichas de prenda</span><span>{state.preview.rows.length} variantes de talla · {state.preview.total} unidades</span></div>
       {step === 1 && <>
       <p className="ec-help">{state.preview.omitted} celdas vacías omitidas. Se creará Uniformidad con Primera uniformidad y Segunda uniformidad.</p>
       <div className="ec-table-wrap" style={{ maxHeight: 360, overflow: "auto" }}><table className="ec-table">

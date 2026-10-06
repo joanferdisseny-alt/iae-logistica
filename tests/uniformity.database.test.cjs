@@ -83,6 +83,7 @@ test('uniformity and personal portal: atomic imports, deliveries, returns and is
     assert.equal(Number(await scalar('select current_stock from inventory_items where id=$1',[mono])),10);
     issued=randomUUID(); await deliver(issued,2,false,position); await deliver(issued,2,false,position);
     assert.equal(Number(await scalar('select current_stock from inventory_items where id=$1',[mono])),8);
+    assert.equal(Number(await scalar('select current_stock from inventory_catalog_items where item_ids @> array[$1::uuid]',[mono])),8);
     await assert.rejects(deliver(issued,4,false,position),/reutilizado/);
     await assert.rejects(deliver(randomUUID(),20,false,position));
     await assert.rejects(deliver(randomUUID(),1,true,null,foreignPerson),/sede/);
@@ -92,6 +93,7 @@ test('uniformity and personal portal: atomic imports, deliveries, returns and is
   await t.test('returns add to the selected stock exactly once and cannot exceed outstanding clothing',async()=>{
     const id=randomUUID(); await giveBack(id,issued,1); await giveBack(id,issued,1);
     assert.equal(Number(await scalar('select current_stock from inventory_items where id=$1',[mono])),9);
+    assert.equal(Number(await scalar('select current_stock from inventory_catalog_items where item_ids @> array[$1::uuid]',[mono])),9);
     assert.equal(await scalar('select returned_quantity from volunteer_deliveries where id=$1',[issued]),1);
     await assert.rejects(giveBack(randomUUID(),issued,2),/superior/);
     const wrong=await scalar('select id from inventory_stock_positions where item_id=$1',[zero]);
@@ -151,6 +153,8 @@ test('uniformity and personal portal: atomic imports, deliveries, returns and is
     assert.equal(await scalar('select count(*)::int from inventory_items where headquarters_id=$1',[hq]),54);
     assert.equal(await scalar('select count(distinct template_id)::int from inventory_items where headquarters_id=$1',[hq]),14);
     assert.equal(Number(await scalar('select sum(current_stock) from inventory_items where headquarters_id=$1',[hq])),558);
+    assert.equal(await scalar('select count(*)::int from inventory_catalog_items where headquarters_id=$1',[hq]),14);
+    assert.equal(Number(await scalar('select sum(current_stock) from inventory_catalog_items where headquarters_id=$1',[hq])),558);
     assert.equal(await scalar("select count(*)::int from inventory_items where headquarters_id=$1 and name='CHALECO TERMICO · L' and current_stock=0",[hq]),1);
     assert.equal(await scalar("select count(*)::int from inventory_items where headquarters_id=$1 and name='MONO INTERVENCIÓN · XXL'",[hq]),0);
   });

@@ -36,6 +36,7 @@ function harness({ role = 'admin', rows = {}, failTable, active = true } = {}) {
   const page = load('app/dashboard/inventory/page.tsx', {
     '@/lib/inventory/categories': load('lib/inventory/categories.ts'),
     '@/lib/inventory/expiry-status': load('lib/inventory/expiry-status.ts'),
+    '@/lib/inventory/size-catalog': load('lib/inventory/size-catalog.ts'),
     'next/link': ({ children, ...props }) => React.createElement('a', props, children),
     'next/navigation': { redirect: href => { throw Error('REDIRECT:' + href); } },
     '@/app/dashboard/inventory/create-item-modal': {
@@ -49,10 +50,14 @@ function harness({ role = 'admin', rows = {}, failTable, active = true } = {}) {
         const call = { table, filters: [], from: 0, to: 499 }; calls.push(call);
         const result = () => {
           if (table === failTable) return { data: null, count: null, error: { code: 'offline', message: 'offline' } };
-          let list = data[table] ?? [];
+          let list = table === 'inventory_catalog_items' ? data.inventory_catalog_items ?? data.inventory_items.map(row => ({
+            ...row, item_ids: [row.id], is_size_group: false, size_count: 0, variants: [],
+            search_text: row.name, operational_statuses: [row.operational_status]
+          })) : data[table] ?? [];
           for (const [op, field, value] of call.filters) {
             if (op === 'eq') list = list.filter(row => row[field] === value);
             if (op === 'in') list = list.filter(row => value.includes(row[field]));
+            if (op === 'contains') list = list.filter(row => value.every(v => row[field].includes(v)));
             if (op === 'gt') list = list.filter(row => row[field] > value);
             if (op === 'lt') list = list.filter(row => row[field] && row[field] < value);
             if (op === 'or') {
@@ -66,7 +71,7 @@ function harness({ role = 'admin', rows = {}, failTable, active = true } = {}) {
         const query = { select: () => query, order: () => query,
           range: (from,to) => { call.from = from; call.to = to; return query; },
           returns: async () => result(), maybeSingle: async () => ({ data: null, error: null }) };
-        for (const op of ['eq','ilike','in','gt','lt','or']) query[op] = (field,value) => { call.filters.push([op,field,value]); return query; };
+        for (const op of ['eq','ilike','in','gt','lt','or','contains']) query[op] = (field,value) => { call.filters.push([op,field,value]); return query; };
         return query;
       } }
     }) }
@@ -113,7 +118,7 @@ test('search is applied in the database across all items and pagination retains 
   assert.equal(search.table(tree).props.rows[0].label, 'Broca especial');
   const h = harness({ rows }); const page = await h.page({ page: '2', q: 'Taladro', category: 'tool', status: 'low', operational_status: 'repair', headquarters: headquartersId });
   assert.equal(h.table(page).props.rows.length, 50);
-  const query = h.calls.find(c => c.table === 'inventory_items'); assert.equal(query.from, 50); assert.equal(query.to, 99);
+  const query = h.calls.find(c => c.table === 'inventory_catalog_items'); assert.equal(query.from, 50); assert.equal(query.to, 99);
   const next = all(page).find(n => n.props?.rel === 'next').props.href;
   const params = new URL(next, 'https://local.example').searchParams;
   for (const [key,value] of Object.entries({ page: '3', q: 'Taladro', category: 'tool', status: 'low', operational_status: 'repair', headquarters: headquartersId })) assert.equal(params.get(key), value);
@@ -123,13 +128,29 @@ test('roles keep site scoping and creation/alert permissions; empty and failed r
   for (const role of ['admin','editor','reader']) {
     const h = harness({ role }); const page = await h.page(); const html = renderToStaticMarkup(page);
     assert.equal(html.includes('Nuevo artículo'), role !== 'reader'); assert.equal(html.includes('Configurar avisos'), role === 'admin');
-    if (role !== 'admin') assert.ok(h.calls.find(c => c.table === 'inventory_items').filters.some(([op,key,value]) => op === 'eq' && key === 'headquarters_id' && value === headquartersId));
+    if (role !== 'admin') assert.ok(h.calls.find(c => c.table === 'inventory_catalog_items').filters.some(([op,key,value]) => op === 'eq' && key === 'headquarters_id' && value === headquartersId));
   }
   const empty = harness({ rows: { inventory_items: [] } }); assert.match(renderToStaticMarkup(await empty.page()), /No hay artículos que coincidan/);
-  for (const failTable of ['inventory_items','inventory_stock_positions']) {
+  for (const failTable of ['inventory_catalog_items','inventory_stock_positions']) {
     const h = harness({ failTable }); const tree = await h.page(); assert.equal(h.table(tree), undefined); assert.match(renderToStaticMarkup(tree), /No se (han podido|pudo) cargar/);
   }
   const inactive = harness({ active: false }); assert.match(renderToStaticMarkup(await inactive.page()), /Acceso bloqueado/); assert.equal(inactive.calls.length, 0);
+});
+
+test('a garment has one row with total stock and a size breakdown including zero quantities and all locations', async () => {
+  const h = harness({ rows: {
+    inventory_catalog_items: [{ ...item, name: 'MONO', search_text: 'MONO M L', item_ids: ['drill', 'large'], is_size_group: true, size_count: 2,
+      current_stock: 4, variants: [{ id: 'drill', size: 'M', quantity: 4 }, { id: 'large', size: 'L', quantity: 0 }] }]
+  } });
+  const props = h.table(await h.page()).props;
+  assert.equal(props.rows.length, 1); assert.equal(props.rows[0].label, 'MONO');
+  let tree = h.render(props);
+  assert.match(renderToStaticMarkup(tree), /2 tallas/);
+  all(tree).find(n => n.type === 'button').props.onClick({ stopPropagation() {} });
+  const html = renderToStaticMarkup(h.render(props));
+  assert.match(html, /Existencias por talla/); assert.match(html, /<th scope="row">M<\/th><td>4<\/td>/);
+  assert.match(html, /<th scope="row">L<\/th><td>0<\/td>/); assert.match(html, /Talla M: 3 uds\./);
+  assert.ok(h.calls.find(c => c.table === 'inventory_stock_positions').filters.some(([op,key,ids]) => op === 'in' && key === 'item_id' && ids.includes('large')));
 });
 
 test('browsing inventory does not load creation catalogues, containers or notification preferences', async () => {

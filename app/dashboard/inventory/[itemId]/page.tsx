@@ -8,6 +8,8 @@ import { requireAccess } from "@/lib/auth/context";
 import { OperationsForm } from "@/app/dashboard/inventory/operations-form";
 import { productProviders, productSourceSchema, productSourceUrl } from "@/lib/inventory/product-source";
 import { currentInventoryStatus, inventoryToday } from "@/lib/inventory/expiry-status";
+import { SizeSummary } from "../size-summary";
+import type { SizeProduct } from "@/lib/inventory/size-catalog";
 
 export const dynamic = "force-dynamic";
 
@@ -146,6 +148,16 @@ export default async function InventoryItemPage({
   const { data: item, error: itemError } = await itemQuery.maybeSingle<ItemDetail>();
   if (itemError) throw new Error("No se pudo cargar la ficha. Comprueba el contrato SQL y los permisos.");
   if (!item) notFound();
+  const productResult = await supabase.from("inventory_catalog_items")
+    .select("id, name, is_size_group, current_stock, unit, size_count, variants")
+    .contains("item_ids", [item.id]).maybeSingle<SizeProduct>();
+  if (productResult.error || !productResult.data) return <section className="ec-card"><div className="ec-card-body ec-stack">
+    <h1 className="ec-h1">No se pudo cargar el catálogo</h1>
+    <p className="ec-error" role="alert">{isAdmin ? "Comprueba supabase/upgrade-size-catalog.sql. No se muestra un desglose parcial ni es necesario volver a importar el stock." : "No se pudo cargar la ficha completa. Contacta con un administrador."}</p>
+    <Link className="ec-btn" href="/dashboard/inventory">Volver</Link>
+  </div></section>;
+  const product = productResult.data;
+  const isSizeGroup = product.is_size_group;
   const status = currentInventoryStatus(item, inventoryToday());
   const headquartersFilter = item.headquarters_id
     ? `headquarters_id.eq.${item.headquarters_id}` : "headquarters_id.is.null";
@@ -190,18 +202,20 @@ export default async function InventoryItemPage({
 
   return (
     <div className="ec-page">
-      <section className="ec-card ec-hero-card">
+      {isSizeGroup && <SizeSummary product={product} selectedId={item.id} />}
+      <section className="ec-card ec-hero-card" id="talla">
         <div className="ec-card-body ec-stack">
           <div className="ec-row ec-row-between ec-row-wrap">
             <div className="ec-col">
-              <div className="ec-muted-2">Ficha de inventario</div>
-              <h1 className="ec-h1">{item.name}</h1>
+              <div className="ec-muted-2">{isSizeGroup ? "Detalle de la talla seleccionada" : "Ficha de inventario"}</div>
+              {isSizeGroup ? <h2 className="ec-h2">Talla {item.technical_specs.uniformidad_talla}</h2> : <h1 className="ec-h1">{item.name}</h1>}
+              {isSizeGroup && <p className="ec-help">Los movimientos, documentos e historiales de abajo corresponden a esta talla, no al total de la prenda.</p>}
             </div>
             <div className="ec-actions">
               <span className={`ec-badge ${badgeClass(status)}`}>{({ ok: "Correcto", low: "Stock bajo", expired: "Caducado", maintenance: "Mantenimiento" } as Record<string, string>)[status] ?? status}</span>
               <span className="ec-badge ec-badge-neutral">{operationalLabels[item.operational_status] ?? item.operational_status}</span>
               <QrModal
-                label="QR de ficha"
+                label={isSizeGroup ? "QR de talla" : "QR de ficha"}
                 path={`/dashboard/inventory/${item.id}`}
                 title={item.name}
               />

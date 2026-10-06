@@ -5,6 +5,7 @@ import { requireAccess } from "@/lib/auth/context";
 import { CatalogTable } from "../templates/catalog-table";
 import { currentInventoryStatus, filterInventoryStatus, inventoryToday } from "@/lib/inventory/expiry-status";
 import { categoryBranch, categoryOptions, type InventoryCategory } from "@/lib/inventory/categories";
+import { sizeTotals, type SizeVariant } from "@/lib/inventory/size-catalog";
 
 export const dynamic = "force-dynamic";
 
@@ -18,12 +19,13 @@ type InventoryRow = {
   unit: string | null;
   status: string;
   operational_status: string | null;
-  location_id: string | null;
   expiration_date: string | null;
   maintenance_due_at: string | null;
-  headquarters: {
-    name: string;
-  } | null;
+  headquarters_id: string | null;
+  item_ids: string[];
+  is_size_group: boolean;
+  size_count: number;
+  variants: SizeVariant[];
 };
 
 type HeadquartersRow = {
@@ -52,7 +54,7 @@ const statusLabels: Record<string, string> = {
 };
 const operationalLabels: Record<string, string> = {
   available: "Disponible", in_use: "En uso", repair: "En reparación",
-  inspection: "En inspección", retired: "Retirado"
+  inspection: "En inspección", retired: "Retirado", mixed: "Varios estados"
 };
 
 // Fetch every RLS-visible option, rather than silently accepting the API row limit.
@@ -118,17 +120,18 @@ export default async function InventoryPage({ searchParams }: {
   const categoriesPromise = readAll((from, to) => supabase.from("inventory_categories")
     .select("code, name, parent_code").order("name").order("code").range(from, to).returns<InventoryCategory[]>());
   const itemsQuery = supabase
-    .from("inventory_items")
+    .from("inventory_catalog_items")
     .select(
-      "id, name, category, subtype, current_stock, minimum_stock, unit, status, operational_status, location_id, expiration_date, maintenance_due_at, headquarters(name)",
+      "id, item_ids, name, category, subtype, current_stock, minimum_stock, unit, status, operational_status, expiration_date, maintenance_due_at, headquarters_id, is_size_group, size_count, variants",
       { count: "exact" }
     )
     .order("created_at", { ascending: false })
     .order("id", { ascending: true })
     .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
-  if (q) itemsQuery.ilike("name", `%${q.replace(/[\\%_*]/g, "\\$&")}%`);
+  if (q) itemsQuery.ilike("search_text", `%${q.replace(/[\\%_*]/g, "\\$&")}%`);
   filterInventoryStatus(itemsQuery, status, today);
-  if (operationalStatus) itemsQuery.eq("operational_status", operationalStatus);
+  if (operationalStatus === "mixed") itemsQuery.eq("operational_status", "mixed");
+  else if (operationalStatus) itemsQuery.contains("operational_statuses", [operationalStatus]);
   if (headquartersFilter) itemsQuery.eq("headquarters_id", headquartersFilter);
   const headquartersQuery = supabase
     .from("headquarters")
@@ -154,11 +157,12 @@ export default async function InventoryPage({ searchParams }: {
 
   // PostgREST may reject a stale/out-of-range offset before returning its count.
   if (itemsResponse.error?.code === "PGRST103") {
-    const countQuery = supabase.from("inventory_items").select("id", { count: "exact", head: true });
-    if (q) countQuery.ilike("name", `%${q.replace(/[\\%_*]/g, "\\$&")}%`);
+    const countQuery = supabase.from("inventory_catalog_items").select("id", { count: "exact", head: true });
+    if (q) countQuery.ilike("search_text", `%${q.replace(/[\\%_*]/g, "\\$&")}%`);
     if (category) countQuery.in("category", categoryBranch(category, categoriesResponse.data));
     filterInventoryStatus(countQuery, status, today);
-    if (operationalStatus) countQuery.eq("operational_status", operationalStatus);
+    if (operationalStatus === "mixed") countQuery.eq("operational_status", "mixed");
+    else if (operationalStatus) countQuery.contains("operational_statuses", [operationalStatus]);
     if (headquartersFilter) countQuery.eq("headquarters_id", headquartersFilter);
     const response = await countQuery;
     if (!response.error && response.count !== null) {
@@ -174,6 +178,11 @@ export default async function InventoryPage({ searchParams }: {
   const failed = failures.filter(([, error]) => error);
   if (failed.length || !itemsResponse.data || itemsResponse.count === null) {
     console.error("Inventory read failed", failed);
+    if (["PGRST205", "42P01"].includes(itemsResponse.error?.code ?? "")) {
+      return <InventoryError message={isAdmin
+        ? "Falta actualizar el catálogo por tallas. Ejecuta supabase/upgrade-size-catalog.sql en SQL Editor del proyecto Supabase de esta aplicación. No vuelvas a importar el Excel: el stock existente se conserva."
+        : "El catálogo necesita una actualización. Contacta con un administrador."} />;
+    }
     if (categoriesResponse.error?.message.includes("parent_code")) {
       return <InventoryError message={isAdmin
         ? "Falta actualizar las categorías de la base de datos. Ejecuta supabase/upgrade-category-hierarchy.sql en SQL Editor del proyecto Supabase configurado en la aplicación."
@@ -188,12 +197,17 @@ export default async function InventoryPage({ searchParams }: {
   }
   const items = itemsResponse.data.map(item => ({ ...item, status: currentInventoryStatus(item, today) }));
   type StockRow = { item_id: string; quantity: number; location_id: string | null; inventory_containers: { name: string; code: string | null; location_id: string | null } | null };
-  const stockResponse = items.length ? await readAll((from,to) => supabase.from("inventory_stock_positions")
-    .select("item_id, quantity, location_id, inventory_containers(name, code, location_id)").in("item_id",items.map(i => i.id))
-    .gt("quantity",0).order("id").range(from,to).returns<StockRow[]>()) : { data: [] as StockRow[], error: null };
-  if (stockResponse.error) return <InventoryError message="No se pudo cargar el reparto de existencias. Comprueba supabase/upgrade-distributed-stock.sql." />;
+  const itemIds = items.flatMap(item => item.item_ids);
+  const stockRows: StockRow[] = [];
+  for (let start = 0; start < itemIds.length; start += 100) {
+    const response = await readAll((from,to) => supabase.from("inventory_stock_positions")
+      .select("item_id, quantity, location_id, inventory_containers(name, code, location_id)").in("item_id",itemIds.slice(start,start+100))
+      .gt("quantity",0).order("id").range(from,to).returns<StockRow[]>());
+    if (response.error) return <InventoryError message="No se pudo cargar el reparto de existencias. Comprueba supabase/upgrade-distributed-stock.sql." />;
+    stockRows.push(...response.data);
+  }
   const stockByItem = new Map<string,StockRow[]>();
-  for (const stock of stockResponse.data) {
+  for (const stock of stockRows) {
     const rows = stockByItem.get(stock.item_id) ?? []; rows.push(stock); stockByItem.set(stock.item_id,rows);
   }
   const totalItems = itemsResponse.count;
@@ -217,9 +231,10 @@ export default async function InventoryPage({ searchParams }: {
     }
     return names.join(" / ");
   };
-  const effectiveLocation = (item: InventoryRow) => (stockByItem.get(item.id) ?? []).map(stock => {
+  const effectiveLocation = (item: InventoryRow) => item.item_ids.flatMap(id => stockByItem.get(id) ?? []).map(stock => {
     const container = stock.inventory_containers;
-    return `${stock.quantity} ${item.unit ?? 'uds.'} · ${container ? `Caja: ${container.name} > ${locationPath(container.location_id)}` : locationPath(stock.location_id)}`;
+    const size = item.is_size_group ? item.variants.find(variant => variant.id === stock.item_id)?.size : null;
+    return `${size ? `Talla ${size}: ` : ""}${stock.quantity} ${item.unit ?? 'uds.'} · ${container ? `Caja: ${container.name} > ${locationPath(container.location_id)}` : locationPath(stock.location_id)}`;
   }).join("; ") || "Sin existencias";
 
   return (
@@ -228,7 +243,7 @@ export default async function InventoryPage({ searchParams }: {
         <div className="ec-card-header">
           <div className="ec-col">
             <div className="ec-row ec-row-wrap"><h1 className="ec-h1">Artículos</h1><span className="ec-badge ec-badge-neutral">{totalItems}</span></div>
-            <span className="ec-help">Existencias, estado y ubicación de cada recurso.</span>
+            <span className="ec-help">Existencias, estado y ubicación de cada recurso. Las tallas de una prenda se reúnen en una sola ficha por sede.</span>
           </div>
           {canManage && <div className="ec-actions">
             <details className="ec-inventory-tools"><summary className="ec-btn">Otras acciones</summary><div className="ec-stack">
@@ -301,7 +316,7 @@ export default async function InventoryPage({ searchParams }: {
                 id: item.id,
                 label: item.name,
                 cells: [
-                  <span key="stock" className="ec-template-count">{item.current_stock} {item.unit ?? "uds."}</span>,
+                  <span key="stock" className="ec-col"><span className="ec-template-count">{item.current_stock} {item.unit ?? "uds."}</span>{item.is_size_group && <span className="ec-help">{item.size_count} tallas</span>}</span>,
                   <span key="alert" className={`ec-badge ${statusBadge(item.status)}`}>{statusLabels[item.status] ?? item.status}</span>,
                   <span key="status" className={`ec-badge ${item.operational_status === "available" ? "ec-badge-ok" : item.operational_status === "repair" || item.operational_status === "inspection" ? "ec-badge-warn" : "ec-badge-neutral"}`}>
                     {item.operational_status ? operationalLabels[item.operational_status] ?? item.operational_status : "Sin informar"}
@@ -318,12 +333,17 @@ export default async function InventoryPage({ searchParams }: {
                     </div>
                   </div>
                   <dl className="ec-inventory-detail-grid">
-                    <div><dt>Sede</dt><dd>{item.headquarters?.name ?? "Sede no accesible"}</dd></div>
+                    <div><dt>Sede</dt><dd>{headquarters.find(site => site.id === item.headquarters_id)?.name ?? "Sede no accesible"}</dd></div>
                     <div><dt>Stock mínimo</dt><dd>{item.minimum_stock !== null ? `${item.minimum_stock} ${item.unit ?? "uds."}` : "Sin configurar"}</dd></div>
                     <div><dt>Caducidad</dt><dd>{item.expiration_date ?? "Sin fecha"}</dd></div>
                     <div><dt>Mantenimiento</dt><dd>{item.maintenance_due_at ?? "Sin fecha"}</dd></div>
                     <div className="ec-inventory-detail-locations"><dt>Ubicaciones y cantidades</dt><dd>{effectiveLocation(item)}</dd></div>
                   </dl>
+                  {item.is_size_group && <div className="ec-table-wrap"><table className="ec-table">
+                    <caption className="ec-help">Existencias por talla</caption>
+                    <thead><tr><th scope="col">Talla</th><th scope="col">Unidades</th></tr></thead>
+                    <tbody>{sizeTotals(item.variants).map(variant => <tr key={variant.size}><th scope="row">{variant.size}</th><td>{variant.quantity}</td></tr>)}</tbody>
+                  </table></div>}
                 </>
               }))}
             />

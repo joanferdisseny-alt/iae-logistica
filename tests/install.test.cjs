@@ -18,6 +18,8 @@ test('generated installer and repeatable atomic upgrade run on an empty database
   const result=await db.query('select * from iae_internal.migrations');
   await db.exec(fs.readFileSync('supabase/upgrade-inventory-import.sql','utf8'));
   await db.exec(fs.readFileSync('supabase/upgrade-member-accounts.sql','utf8'));
-  assert.equal(result.rows.length,14);
+  await db.exec(fs.readFileSync('supabase/upgrade-size-catalog.sql','utf8'));
+  assert.equal(result.rows.length,15);
+  assert.ok(result.rows.some(row=>row.version==='202610060003_size_catalog.sql'));
   assert.equal((await db.query("select public from storage.buckets where id='inventory-documents'")).rows[0].public,false);
 });
