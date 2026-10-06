@@ -1,227 +1,110 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { currentWorkspaceLink, workspaceAreas } from "@/lib/navigation";
 
-type DashboardShellProps = {
-  children: ReactNode;
-  roleCode: string;
-  roleName: string;
-  signOutAction: () => Promise<void>;
-  userLabel: string;
-};
-
-type NavItem = {
-  href: string;
-  label: string;
-  icon: "home" | "box" | "pin" | "template" | "building" | "users";
-  adminOnly?: boolean;
-};
-
-const navItems: NavItem[] = [
-  { href: "/dashboard", label: "Resumen", icon: "home" },
-  { href: "/dashboard/personal", label: "Mi material", icon: "users" },
-  { href: "/dashboard/inventory", label: "Inventario", icon: "box" },
-  { href: "/dashboard/locations", label: "Ubicaciones", icon: "pin" },
-  { href: "/dashboard/requests", label: "Solicitudes", icon: "box" },
-  { href: "/dashboard/checklists", label: "Checklists", icon: "template" },
-  { href: "/dashboard/receiving", label: "Recepción", icon: "box" },
-  { href: "/dashboard/templates", label: "Fichas", icon: "template", adminOnly: true },
-  { href: "/dashboard/headquarters", label: "Sedes", icon: "building", adminOnly: true },
-  { href: "/dashboard/users", label: "Usuarios", icon: "users", adminOnly: true },
-  { href: "/dashboard/volunteers", label: "Voluntarios y entregas", icon: "users", adminOnly: true },
-  { href: "/dashboard/imports", label: "Importar uniformidad", icon: "template", adminOnly: true }
-];
-
-function NavIcon({ name }: { name: NavItem["icon"] }) {
-  const commonProps = {
-    "aria-hidden": true,
-    className: "ec-nav-icon",
-    fill: "none",
-    viewBox: "0 0 24 24",
-    xmlns: "http://www.w3.org/2000/svg"
+function Icon({ name }: { name: string }) {
+  const paths: Record<string, string> = {
+    home: "M3 11 12 3l9 8M5 10v11h14V10M9 21v-7h6v7",
+    box: "m3 7 9-4 9 4v10l-9 4-9-4V7Zm0 0 9 5 9-5M12 12v9",
+    pin: "M18 10c0 5-6 11-6 11S6 15 6 10a6 6 0 1 1 12 0ZM10 10h4",
+    users: "M3 21v-2a5 5 0 0 1 10 0v2M8 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M17 4a4 4 0 0 1 0 8M17 15a5 5 0 0 1 4 5",
+    settings: "M4 6h16M4 12h16M4 18h16M8 3v6M16 9v6M10 15v6",
+    logout: "M9 3H4v18h5M13 8l5 4-5 4M8 12h12",
+    panel: "M3 4h18v16H3V4ZM9 4v16",
+    menu: "M4 6h16M4 12h16M4 18h16"
   };
-
-  if (name === "box") {
-    return (
-      <svg {...commonProps}>
-        <path d="M4 8.5 12 4l8 4.5v7L12 20l-8-4.5v-7Z" />
-        <path d="m4 8.5 8 4.5 8-4.5M12 13v7" />
-      </svg>
-    );
-  }
-
-  if (name === "pin") {
-    return (
-      <svg {...commonProps}>
-        <path d="M12 21s6-5.2 6-11A6 6 0 0 0 6 10c0 5.8 6 11 6 11Z" />
-        <path d="M12 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z" />
-      </svg>
-    );
-  }
-
-  if (name === "template") {
-    return (
-      <svg {...commonProps}>
-        <path d="M4 5h16v14H4V5Z" />
-        <path d="M8 5v14M4 10h16" />
-      </svg>
-    );
-  }
-
-  if (name === "building") {
-    return (
-      <svg {...commonProps}>
-        <path d="M5 21V5l8-2v18M13 8h6v13" />
-        <path d="M8 8h2M8 12h2M8 16h2M16 12h1M16 16h1M4 21h17" />
-      </svg>
-    );
-  }
-
-  if (name === "users") {
-    return (
-      <svg {...commonProps}>
-        <path d="M16 20v-1.5c0-2-1.8-3.5-4-3.5s-4 1.5-4 3.5V20" />
-        <path d="M12 12a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM19 20v-1.2c0-1.5-1-2.7-2.5-3.3M16 6.3a2.5 2.5 0 0 1 0 4.4" />
-      </svg>
-    );
-  }
-
-  return (
-    <svg {...commonProps}>
-      <path d="M4 10.5 12 4l8 6.5V20H5.5v-6.5H4v-3Z" />
-      <path d="M10 20v-5h4v5" />
-    </svg>
-  );
+  return <svg className="ec-nav-icon" aria-hidden="true" fill="none" viewBox="0 0 24 24"><path d={paths[name] ?? paths.box} /></svg>;
 }
 
-export function DashboardShell({
-  children,
-  roleCode,
-  roleName,
-  signOutAction,
-  userLabel
-}: DashboardShellProps) {
+export function DashboardShell({ children, roleCode, roleName, signOutAction, userLabel }: {
+  children: ReactNode; roleCode: string; roleName: string; signOutAction: () => Promise<void>; userLabel: string;
+}) {
   const pathname = usePathname();
+  const areas = workspaceAreas(roleCode);
+  const current = currentWorkspaceLink(areas, pathname);
+  const [collapsed, setCollapsed] = useState(false);
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const drawer = useRef<HTMLDialogElement>(null);
+  const tabs = useRef<HTMLElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [menuCollapsed, setMenuCollapsed] = useState(false);
-  const visibleItems = navItems.filter((item) => roleCode === "volunteer"
-    ? ["/dashboard/personal", "/dashboard/requests"].includes(item.href)
-    : !item.adminOnly || roleCode === "admin");
-  const currentItem =
-    visibleItems.find(
-      (item) => pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(`${item.href}/`))
-    ) ?? visibleItems[0];
+  const home = roleCode === "volunteer" ? "/dashboard/personal" : "/dashboard";
 
-  return (
-    <div className={`ec-app ${menuCollapsed ? "ec-app-collapsed" : ""}`}>
-      <button
-        aria-label={menuOpen ? "Cerrar menú" : "Abrir menú"}
-        className="ec-menu-toggle"
-        onClick={() => setMenuOpen((open) => !open)}
-        type="button"
-      >
-        <span />
-        <span />
-        <span />
-      </button>
+  useEffect(() => {
+    try { setCollapsed(localStorage.getItem("iae-sidebar-collapsed") === "true"); } catch {}
+  }, []);
+  useEffect(() => {
+    drawer.current?.close();
+    setExpanded(null);
+    const nav = tabs.current;
+    const link = nav?.querySelector<HTMLElement>('[aria-current="page"]');
+    if (nav && link) nav.scrollLeft += link.getBoundingClientRect().left - nav.getBoundingClientRect().left - 12;
+  }, [pathname]);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const before = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const desktop = window.matchMedia("(min-width: 901px)");
+    const closeOnDesktop = () => { if (desktop.matches) drawer.current?.close(); };
+    desktop.addEventListener("change", closeOnDesktop);
+    return () => { document.body.style.overflow = before; desktop.removeEventListener("change", closeOnDesktop); };
+  }, [menuOpen]);
 
-      {menuOpen ? (
-        <button
-          aria-label="Cerrar menú"
-          className="ec-sidebar-scrim"
-          onClick={() => setMenuOpen(false)}
-          type="button"
-        />
-      ) : null}
-
-      <aside className={`ec-sidebar ${menuOpen ? "is-open" : ""}`}>
-        <div className="ec-sidebar-top">
-          <div className="ec-sidebar-brand">
-            <img alt="IAE Rescue" className="ec-sidebar-logo" src="/logo_iae.png" />
-            <div className="ec-sidebar-brand-copy">
-              <div className="ec-sidebar-kicker">IAE Logistica</div>
-              <strong>Panel operativo</strong>
-            </div>
-          </div>
-          <button
-            aria-label={menuCollapsed ? "Mostrar menú lateral" : "Esconder menú lateral"}
-            aria-pressed={menuCollapsed}
-            className="ec-sidebar-icon-button"
-            onClick={() => setMenuCollapsed((collapsed) => !collapsed)}
-            title={menuCollapsed ? "Mostrar menú" : "Esconder menú"}
-            type="button"
-          >
-            <span className="ec-panel-icon" aria-hidden="true" />
-          </button>
-        </div>
-
-        <div className="ec-sidebar-user">
-          <div className="ec-user-avatar" aria-hidden="true">
-            {userLabel.slice(0, 2).toUpperCase()}
-          </div>
-          <div className="ec-sidebar-user-copy">
-            <div className="ec-muted-2">Sesión</div>
-            <strong>{userLabel}</strong>
-            <span className="ec-badge ec-badge-neutral">{roleName}</span>
-          </div>
-        </div>
-
-        <nav className="ec-sidebar-nav">
-          {visibleItems.map((item) => {
-            const active =
-              pathname === item.href ||
-              (item.href !== "/dashboard" && pathname.startsWith(`${item.href}/`));
-
-            return (
-              <Link
-                className={`ec-sidebar-link ${active ? "is-active" : ""}`}
-                href={item.href}
-                key={item.href}
-                onClick={() => setMenuOpen(false)}
-                title={item.label}
-              >
-                <NavIcon name={item.icon} />
-                <span className="ec-sidebar-link-label">{item.label}</span>
-              </Link>
-            );
-          })}
-        </nav>
-
-        <form action={signOutAction} className="ec-sidebar-logout">
-          <button className="ec-sidebar-link ec-sidebar-button" title="Cerrar sesión" type="submit">
-            <span className="ec-nav-icon ec-logout-icon" aria-hidden="true" />
-            <span className="ec-sidebar-link-label">Cerrar sesión</span>
-          </button>
-        </form>
-      </aside>
-
-      <main className="ec-main">
-        <header className="ec-mobile-topbar">
-          <img alt="IAE Rescue" className="ec-mobile-logo" src="/logo_iae.png" />
-          <div>
-            <div className="ec-muted-2">Sección</div>
-            <strong>{currentItem?.label ?? "Panel"}</strong>
-          </div>
-        </header>
-        <div className="ec-main-inner">{children}</div>
-      </main>
-
-      <nav className="ec-mobile-nav">
-        {visibleItems.slice(0, 5).map((item) => {
-          const active =
-            pathname === item.href ||
-            (item.href !== "/dashboard" && pathname.startsWith(`${item.href}/`));
-
-          return (
-            <Link className={`ec-mobile-nav-link ${active ? "is-active" : ""}`} href={item.href} key={item.href}>
-              {item.label}
-            </Link>
-          );
-        })}
-      </nav>
+  const closeMenu = () => drawer.current?.close();
+  const navigation = (mobile: boolean) => <>
+    <div className="ec-erp-brand">
+      <Link href={home} onClick={closeMenu} aria-label="IAE Logística, inicio"><img src="/logo_iae.png" alt="IAE Rescue" width="64" height="48" /></Link>
+      <div className="ec-erp-brand-copy"><strong>IAE</strong><span>Logística y recursos</span></div>
+      {mobile ? <button className="ec-erp-icon-button" type="button" onClick={closeMenu} aria-label="Cerrar menú">✕</button> :
+        <button type="button" className="ec-erp-icon-button ec-erp-collapse" aria-label={collapsed ? "Ampliar menú" : "Reducir menú"} aria-expanded={!collapsed}
+          onClick={() => { const next = !collapsed; setCollapsed(next); try { localStorage.setItem("iae-sidebar-collapsed", String(next)); } catch {} }}><Icon name="panel" /></button>}
     </div>
-  );
+    <nav className="ec-erp-navigation" aria-label={mobile ? "Menú móvil" : "Menú principal"}>
+      {roleCode !== "volunteer" && <Link href={home} prefetch={false} className={`ec-erp-nav-heading ${pathname === home ? "is-active" : ""}`} aria-current={pathname === home ? "page" : undefined} title="Inicio" onClick={closeMenu}>
+        <Icon name="home" /><span>Inicio</span>
+      </Link>}
+      {areas.map(area => {
+        const active = area.id === current?.area.id;
+        const open = (mobile || !collapsed) && (expanded === area.id || (expanded === null && active));
+        const id = `${mobile ? "mobile" : "desktop"}-${area.id}`;
+        return <div className="ec-erp-nav-group" key={area.id}>
+          <button type="button" className={`ec-erp-nav-heading ${active ? "is-active" : ""}`} aria-expanded={open} aria-controls={id} title={area.label}
+            onClick={() => { if (!mobile && collapsed) { setCollapsed(false); try { localStorage.setItem("iae-sidebar-collapsed", "false"); } catch {} } setExpanded(open ? "" : area.id); }}>
+            <Icon name={area.icon} /><span>{area.label}</span><span className="ec-erp-chevron" aria-hidden="true">{open ? "−" : "+"}</span>
+          </button>
+          <div id={id} className="ec-erp-nav-children" hidden={!open}>
+            {area.links.map(link => <Link key={link.href} href={link.href} prefetch={false} onClick={closeMenu}
+              aria-current={link.href === current?.link.href ? "page" : undefined}>{link.label}</Link>)}
+          </div>
+        </div>;
+      })}
+    </nav>
+    <div className="ec-erp-account">
+      <div className="ec-erp-avatar" aria-hidden="true">{userLabel.slice(0, 2).toUpperCase()}</div>
+      <div className="ec-erp-account-copy"><strong title={userLabel}>{userLabel}</strong><span>{roleName}</span></div>
+      <form action={signOutAction}><button type="submit" className="ec-erp-icon-button" title="Cerrar sesión" aria-label="Cerrar sesión"><Icon name="logout" /></button></form>
+    </div>
+  </>;
+
+  return <div className={`ec-app ec-erp ${collapsed ? "ec-erp-collapsed" : ""}`}>
+    <a className="ec-skip-link" href="#workspace">Ir al contenido</a>
+    <aside className="ec-erp-sidebar">{navigation(false)}</aside>
+    <dialog className="ec-erp-drawer" ref={drawer} aria-label="Navegación" onClose={() => setMenuOpen(false)} onClick={event => { if (event.target === event.currentTarget) closeMenu(); }}>
+      <div className="ec-erp-drawer-body">{navigation(true)}</div>
+    </dialog>
+    <main className="ec-main" id="workspace" tabIndex={-1}>
+      <header className="ec-erp-topbar">
+        <button type="button" className="ec-erp-mobile-toggle ec-btn" aria-label="Abrir menú" aria-haspopup="dialog" aria-expanded={menuOpen}
+          onClick={() => { drawer.current?.showModal(); setMenuOpen(true); }}><Icon name="menu" /></button>
+        <nav aria-label="Ruta de navegación" className="ec-erp-breadcrumb"><Link href={home}>IAE</Link><span aria-hidden="true">/</span><span>{current?.area.label ?? "Inicio"}</span>{current && <><span aria-hidden="true">/</span><strong>{current.link.label}</strong></>}</nav>
+        <span className="ec-erp-role">{roleName}</span>
+      </header>
+      {current && current.area.links.length > 1 && <nav className="ec-erp-tabs" ref={tabs} aria-label={current.area.label}>
+        {current.area.links.map(link => <Link key={link.href} href={link.href} prefetch={false} aria-current={link.href === current.link.href ? "page" : undefined}>{link.label}</Link>)}
+      </nav>}
+      <div className="ec-main-inner">{children}</div>
+    </main>
+  </div>;
 }

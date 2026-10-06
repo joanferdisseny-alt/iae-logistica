@@ -70,20 +70,25 @@ function CategoryParentSelect({ categories, value = "" }: { categories: Category
   </label>;
 }
 
-export function CreateCategoryForm({ categories }: { categories: CategoryOption[] }) {
+function NameAndCodeFields({ placeholder }: { placeholder: string }) {
+  const [name, setName] = useState("");
+  const [customCode, setCustomCode] = useState<string | null>(null);
+  const automaticCode = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+  return <>
+    <label className="ec-label">Nombre<input className="ec-input" name="name" placeholder={placeholder} value={name} onChange={event => setName(event.target.value)} required /></label>
+    <label className="ec-label">Código interno<input className="ec-input" name="code" value={customCode ?? automaticCode} onChange={event => setCustomCode(event.target.value)} required />
+      <span className="ec-help">Se genera a partir del nombre. Puedes cambiarlo antes de guardar; debe ser único.</span>
+    </label>
+  </>;
+}
+
+export function CreateCategoryForm({ categories, parentCode }: { categories: CategoryOption[]; parentCode?: string }) {
   const [state, formAction, pending] = useActionState(createInventoryCategory, undefined);
 
   return (
     <form action={formAction} className="ec-stack">
-      <label className="ec-label">
-        <span>Código</span>
-        <input className="ec-input" name="code" placeholder="herramienta_electrica" required />
-      </label>
-      <label className="ec-label">
-        <span>Nombre</span>
-        <input className="ec-input" name="name" placeholder="Herramienta eléctrica" required />
-      </label>
-      <CategoryParentSelect categories={categories} />
+      <NameAndCodeFields placeholder="Herramienta eléctrica" />
+      <CategoryParentSelect categories={categories} value={parentCode} />
       <label className="ec-label">
         <span>Descripción</span>
         <textarea className="ec-textarea" name="description" rows={3} />
@@ -97,17 +102,17 @@ export function CreateCategoryForm({ categories }: { categories: CategoryOption[
   );
 }
 
-export function CreateCategoryModal({ categories }: { categories: CategoryOption[] }) {
+export function CreateCategoryModal({ categories, parentCode }: { categories: CategoryOption[]; parentCode?: string }) {
   const [open, setOpen] = useState(false);
 
   return (
     <>
-      <button className="ec-btn ec-btn-primary" onClick={() => setOpen(true)} type="button">
-        Nueva categoria
+      <button className={`ec-btn ${parentCode ? "" : "ec-btn-primary"}`} onClick={() => setOpen(true)} type="button">
+        {parentCode ? "Añadir subcategoría" : "Nueva categoría"}
       </button>
 
-      <ModalShell kicker="Categorias" open={open} setOpen={setOpen} title="Crear categoria">
-        <CreateCategoryForm categories={categories} />
+      <ModalShell kicker="Categorías" open={open} setOpen={setOpen} title={parentCode ? "Crear subcategoría" : "Crear categoría"}>
+        <CreateCategoryForm categories={categories} parentCode={parentCode} />
       </ModalShell>
     </>
   );
@@ -118,14 +123,7 @@ export function CreateTemplateForm({ categories }: { categories: CategoryOption[
 
   return (
     <form action={formAction} className="ec-stack">
-      <label className="ec-label">
-        <span>Código</span>
-        <input className="ec-input" name="code" placeholder="taladro_bateria" required />
-      </label>
-      <label className="ec-label">
-        <span>Nombre</span>
-        <input className="ec-input" name="name" placeholder="Taladro a batería" required />
-      </label>
+      <NameAndCodeFields placeholder="Taladro a batería" />
       <label className="ec-label">
         <span>Categoría</span>
         <select className="ec-select" defaultValue="" name="categoryCode" required>
@@ -146,7 +144,7 @@ export function CreateTemplateForm({ categories }: { categories: CategoryOption[
       {state?.error ? <p className="ec-error">{state.error}</p> : null}
       {state?.success ? <p className="ec-success">{state.success}</p> : null}
       <button className="ec-btn ec-btn-primary ec-btn-block" disabled={pending} type="submit">
-        {pending ? "Guardando..." : "Crear ficha"}
+        {pending ? "Guardando..." : "Crear tipo de artículo"}
       </button>
     </form>
   );
@@ -158,10 +156,11 @@ export function CreateTemplateModal({ categories }: { categories: CategoryOption
   return (
     <>
       <button className="ec-btn ec-btn-primary" onClick={() => setOpen(true)} type="button">
-        Nueva ficha
+        Nuevo tipo
       </button>
 
-      <ModalShell kicker="Fichas" open={open} setOpen={setOpen} title="Crear ficha">
+      <ModalShell kicker="Catálogo" open={open} setOpen={setOpen} title="Crear tipo de artículo">
+        <p className="ec-help">Define el nombre y la categoría. Después selecciona el tipo en la tabla y pulsa «Añadir campo» para configurar su ficha.</p>
         <CreateTemplateForm categories={categories} />
       </ModalShell>
     </>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { newChecklistId } from "../checklists/id";
 import { useActionState } from "react";
 import { createInventoryItem } from "@/app/dashboard/actions";
@@ -95,8 +96,9 @@ export function CreateInventoryItemForm({
     return (
       <div className="ec-stack">
         <p className="ec-muted">
-          No hay fichas configuradas todavía. Crea una desde la administración de fichas.
+          Todavía no hay tipos de artículo configurados. Un administrador debe crear uno y asignarle los campos.
         </p>
+        {canChooseHeadquarters && <Link className="ec-btn" href="/dashboard/templates">Configurar tipos de artículo</Link>}
       </div>
     );
   }
@@ -111,6 +113,7 @@ export function CreateInventoryItemForm({
         <input name="headquartersId" type="hidden" value={userHeadquartersId ?? ""} />
       ) : null}
 
+      <div className="ec-form-grid">
       {canChooseHeadquarters ? (
         <label className="ec-label">
           <span>Sede</span>
@@ -126,28 +129,98 @@ export function CreateInventoryItemForm({
       ) : null}
 
       <label className="ec-label">
-        <span>Tipo de ficha</span>
+        <span>Tipo de artículo</span>
         <select
           className="ec-select"
           name="templateCodeSelector"
           onChange={(event) => setSelectedTemplateCode(event.target.value)}
           value={selectedTemplate?.code ?? ""}
         >
-          {templates.map((template) => (
-            <option key={template.code} value={template.code}>
-              {template.name}
-            </option>
-          ))}
+          {Array.from(new Set(templates.map(template => template.category))).map(category => <optgroup key={category} label={templates.find(template => template.category === category)?.categoryName ?? category}>
+            {templates.filter(template => template.category === category).map(template => <option key={template.code} value={template.code}>{template.name}</option>)}
+          </optgroup>)}
         </select>
       </label>
 
+      </div>
       {selectedTemplate ? <p className="ec-help">{selectedTemplate.description}</p> : null}
 
+      <section className="ec-template-fields ec-item-fields" key={selectedTemplate?.code}>
+        <div className="ec-col">
+          <h3 className="ec-h3">Datos del artículo</h3>
+          <div className="ec-help">
+            Completa los campos del tipo seleccionado. Los marcados con * son obligatorios.
+          </div>
+        </div>
+
+        {selectedTemplate?.fields?.length ? (
+          selectedTemplate.fields.map((field) => {
+            const inputName = `templateField_${field.key}`;
+            if (onCreated && field.key === "current_stock") return <input key={field.key} name={inputName} type="hidden" value="0" />;
+
+            if (field.type === "textarea") {
+              return (
+                <label className="ec-label ec-item-long-field" key={field.key}>
+                  <span>{field.label}{field.required ? " *" : ""}</span>
+                  <textarea
+                    className="ec-textarea"
+                    name={inputName}
+                    placeholder={field.placeholder}
+                    required={field.required}
+                    rows={3}
+                  />
+                </label>
+              );
+            }
+
+            if (field.type === "select") {
+              return (
+                <label className="ec-label" key={field.key}>
+                  <span>{field.label}{field.required ? " *" : ""}</span>
+                  <select className="ec-select" name={inputName} required={field.required}>
+                    <option value="">Selecciona</option>
+                    {(field.options ?? []).map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              );
+            }
+
+            if (field.type === "boolean") {
+              return (
+                <label className="ec-checkbox" key={field.key}>
+                  <input name={inputName} type="checkbox" value="true" />
+                  <span>{field.label}{field.required ? " *" : ""}</span>
+                </label>
+              );
+            }
+
+            return (
+              <label className="ec-label" key={field.key}>
+                <span>{field.label}{field.required ? " *" : ""}</span>
+                  <input
+                  step={field.type === "number" ? "0.001" : undefined}
+                  className="ec-input"
+                  name={inputName}
+                  placeholder={field.placeholder}
+                  required={field.required}
+                  type={field.type === "number" ? "number" : field.type === "date" ? "date" : "text"}
+                />
+              </label>
+            );
+          })
+        ) : (
+          <div className="ec-help">Esta ficha no tiene campos configurados todavia.</div>
+        )}
+      </section>
       {!onCreated && <section className="ec-template-fields">
         <div className="ec-col">
           <h3 className="ec-h3">Ubicación inicial</h3>
           <div className="ec-help">
-            El artículo puede estar en una ubicación física o dentro de una caja. No puede tener ambas.
+            El stock inicial va a una ubicación o caja. Después puedes repartirlo entre varios destinos desde la ficha.
           </div>
         </div>
 
@@ -203,79 +276,6 @@ export function CreateInventoryItemForm({
         ) : null}
       </section>}
 
-      <section className="ec-template-fields" key={selectedTemplate?.code}>
-        <div className="ec-col">
-          <h3 className="ec-h3">Campos de la ficha</h3>
-          <div className="ec-help">
-            Estos campos salen directamente de la configuracion hecha en la seccion de fichas.
-            Si quieres que el sistema use un dato para stock, caducidad o alertas,
-            crea ese campo con una clave especial en la administracion de campos.
-          </div>
-        </div>
-
-        {selectedTemplate?.fields?.length ? (
-          selectedTemplate.fields.map((field) => {
-            const inputName = `templateField_${field.key}`;
-            if (onCreated && field.key === "current_stock") return <input key={field.key} name={inputName} type="hidden" value="0" />;
-
-            if (field.type === "textarea") {
-              return (
-                <label className="ec-label" key={field.key}>
-                  <span>{field.label}</span>
-                  <textarea
-                    className="ec-textarea"
-                    name={inputName}
-                    placeholder={field.placeholder}
-                    required={field.required}
-                    rows={3}
-                  />
-                </label>
-              );
-            }
-
-            if (field.type === "select") {
-              return (
-                <label className="ec-label" key={field.key}>
-                  <span>{field.label}</span>
-                  <select className="ec-select" name={inputName} required={field.required}>
-                    <option value="">Selecciona</option>
-                    {(field.options ?? []).map((option) => (
-                      <option key={option} value={option}>
-                        {option}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              );
-            }
-
-            if (field.type === "boolean") {
-              return (
-                <label className="ec-checkbox" key={field.key}>
-                  <input name={inputName} type="checkbox" value="true" />
-                  <span>{field.label}</span>
-                </label>
-              );
-            }
-
-            return (
-              <label className="ec-label" key={field.key}>
-                <span>{field.label}</span>
-                  <input
-                  step={field.type === "number" ? "0.001" : undefined}
-                  className="ec-input"
-                  name={inputName}
-                  placeholder={field.placeholder}
-                  required={field.required}
-                  type={field.type === "number" ? "number" : field.type === "date" ? "date" : "text"}
-                />
-              </label>
-            );
-          })
-        ) : (
-          <div className="ec-help">Esta ficha no tiene campos configurados todavia.</div>
-        )}
-      </section>
       </fieldset>
 
       {state?.error ? <p className="ec-error">{state.error}</p> : null}

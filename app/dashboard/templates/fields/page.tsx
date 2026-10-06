@@ -5,7 +5,6 @@ import {
   EditFieldForm
 } from "@/app/dashboard/templates/forms";
 import { SpecialKeysModal } from "@/app/dashboard/templates/special-keys-modal";
-import { TemplatesSubnav } from "@/app/dashboard/templates/subnav";
 import { CatalogTable } from "../catalog-table";
 
 export const dynamic = "force-dynamic";
@@ -35,7 +34,7 @@ export default async function TemplateFieldsPage() {
 
   return (
     <div className="ec-page">
-      <TemplatesSubnav />
+
 
       <section className="ec-card">
         <div className="ec-card-header ec-row-wrap">
@@ -48,12 +47,14 @@ export default async function TemplateFieldsPage() {
             <CreateFieldCatalogModal />
           </div>
         </div>
+        <p className="ec-section-intro">Características reutilizables, como talla, marca o caducidad. Crea el campo una vez y añádelo a los tipos de artículo que lo necesiten.</p>
         <CatalogTable
+          searchable
           columns={[{ label: "Campo", className: "ec-field-name-column" }, { label: "Clave" }, { label: "Tipo", className: "ec-field-type-column" }]}
           caption="Selecciona un campo para ver sus opciones o editarlo."
           emptyMessage="Todavía no hay campos configurados. Crea el primero con «Nuevo campo»."
           rows={fields.map(field => ({
-          id: field.id, label: field.label,
+          id: field.id, label: field.label, searchText: field.field_key,
           cells: [<code key="key">{field.field_key}</code>, fieldTypeLabels[field.field_type] ?? field.field_type],
           details: <div className="ec-template-detail-heading">
             <div className="ec-template-description">

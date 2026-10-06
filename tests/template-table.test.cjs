@@ -68,6 +68,6 @@ test('refreshed field counts and details keep the same selected template', () =>
 
 test('empty catalogue has useful instructions rather than an empty table', () => {
   const html = renderToStaticMarkup(harness()([]));
-  assert.match(html,/Nueva ficha/);
+  assert.match(html,/Nuevo tipo/);
   assert.doesNotMatch(html,/<table/);
 });

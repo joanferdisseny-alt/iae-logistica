@@ -1,7 +1,7 @@
 "use client";
 import { DialogFocus } from "@/app/dashboard/dialog-focus";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { saveNotificationPreferences } from "@/app/dashboard/actions";
 
 type NotificationPreferences = {
@@ -12,14 +12,16 @@ type NotificationPreferences = {
 };
 
 export function NotificationPreferencesForm({
-  initialValues
+  initialValues, onBusy
 }: {
   initialValues: NotificationPreferences;
+  onBusy?: (busy: boolean) => void;
 }) {
   const [state, formAction, pending] = useActionState(
     saveNotificationPreferences,
     undefined
   );
+  useEffect(() => { onBusy?.(pending); return () => onBusy?.(false); }, [pending, onBusy]);
 
   return (
     <form action={formAction} className="ec-stack">

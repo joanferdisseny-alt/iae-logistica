@@ -1,10 +1,10 @@
+import Link from "next/link";
 import { requireAccess } from "@/lib/auth/context";
 import { redirect } from "next/navigation";
 import {
   CreateCategoryModal,
   EditCategoryForm
 } from "@/app/dashboard/templates/forms";
-import { TemplatesSubnav } from "@/app/dashboard/templates/subnav";
 import { CatalogTable } from "../catalog-table";
 import { categoryBranch, categoryOptions } from "@/lib/inventory/categories";
 
@@ -35,7 +35,7 @@ export default async function TemplateCategoriesPage() {
 
   return (
     <div className="ec-page">
-      <TemplatesSubnav />
+
 
       <section className="ec-card">
         <div className="ec-card-header ec-row-wrap">
@@ -45,7 +45,9 @@ export default async function TemplateCategoriesPage() {
           </div>
           <CreateCategoryModal categories={options} />
         </div>
+        <p className="ec-section-intro">Agrupa el catálogo por familias. Una subcategoría es una categoría con otra superior: Uniformidad / Primera equipación.</p>
         <CatalogTable
+          searchable
           columns={[{ label: "Categoría / subcategoría", className: "ec-template-name-column" }, { label: "Código" }]}
           caption="Selecciona una categoría para ver su descripción o editarla."
           emptyMessage="Todavía no hay categorías configuradas. Crea la primera con «Nueva categoría»."
@@ -53,7 +55,7 @@ export default async function TemplateCategoriesPage() {
             const category = byCode.get(option.code)!;
             const excludedParents = new Set(categoryBranch(category.code, categories));
             return {
-              id: category.code, label: option.name, cells: [<code key="code">{category.code}</code>],
+              id: category.code, label: option.name, searchText: category.code, cells: [<code key="code">{category.code}</code>],
               details: <div className="ec-template-detail-heading">
                 <div className="ec-template-description">
                   <h2 className="ec-h3">Descripción</h2>
@@ -61,6 +63,8 @@ export default async function TemplateCategoriesPage() {
                   <p className="ec-help">Solo se puede eliminar si no tiene subcategorías, fichas ni artículos asociados. Los campos se configuran en cada ficha.</p>
                 </div>
                 <div className="ec-actions ec-template-detail-tools">
+                  <Link className="ec-btn" href={`/dashboard/inventory?category=${encodeURIComponent(category.code)}`}>Ver artículos</Link>
+                  <CreateCategoryModal categories={options} parentCode={category.code} />
                   <EditCategoryForm category={category} categories={options.filter(parent => !excludedParents.has(parent.code))} />
                 </div>
               </div>

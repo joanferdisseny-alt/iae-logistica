@@ -38,8 +38,10 @@ function harness({ role = 'admin', rows = {}, failTable, active = true } = {}) {
     '@/lib/inventory/expiry-status': load('lib/inventory/expiry-status.ts'),
     'next/link': ({ children, ...props }) => React.createElement('a', props, children),
     'next/navigation': { redirect: href => { throw Error('REDIRECT:' + href); } },
-    '@/app/dashboard/inventory/create-item-modal': { CreateItemModal: () => React.createElement('button', null, 'Nueva ficha') },
-    '@/app/dashboard/inventory/notification-preferences-form': { NotificationPreferencesModal: () => React.createElement('button', null, 'Avisos de caducidad') },
+    '@/app/dashboard/inventory/create-item-modal': {
+      CreateItemModal: () => React.createElement('button', null, 'Nuevo artículo'),
+      InventoryAlertsModal: () => React.createElement('button', null, 'Configurar avisos')
+    },
     '../templates/catalog-table': { CatalogTable },
     '@/lib/auth/context': { requireAccess: async () => ({
       isAdmin: role === 'admin', roleCode: role, user: { id: 'user' }, profile: { is_active: active, headquarters_id: headquartersId },
@@ -120,7 +122,7 @@ test('search is applied in the database across all items and pagination retains 
 test('roles keep site scoping and creation/alert permissions; empty and failed reads are explicit', async () => {
   for (const role of ['admin','editor','reader']) {
     const h = harness({ role }); const page = await h.page(); const html = renderToStaticMarkup(page);
-    assert.equal(html.includes('Nueva ficha'), role !== 'reader'); assert.equal(html.includes('Avisos de caducidad'), role === 'admin');
+    assert.equal(html.includes('Nuevo artículo'), role !== 'reader'); assert.equal(html.includes('Configurar avisos'), role === 'admin');
     if (role !== 'admin') assert.ok(h.calls.find(c => c.table === 'inventory_items').filters.some(([op,key,value]) => op === 'eq' && key === 'headquarters_id' && value === headquartersId));
   }
   const empty = harness({ rows: { inventory_items: [] } }); assert.match(renderToStaticMarkup(await empty.page()), /No hay artículos que coincidan/);
@@ -128,6 +130,17 @@ test('roles keep site scoping and creation/alert permissions; empty and failed r
     const h = harness({ failTable }); const tree = await h.page(); assert.equal(h.table(tree), undefined); assert.match(renderToStaticMarkup(tree), /No se (han podido|pudo) cargar/);
   }
   const inactive = harness({ active: false }); assert.match(renderToStaticMarkup(await inactive.page()), /Acceso bloqueado/); assert.equal(inactive.calls.length, 0);
+});
+
+test('browsing inventory does not load creation catalogues, containers or notification preferences', async () => {
+  for (const role of ['admin', 'editor', 'reader']) {
+    const h = harness({ role });
+    await h.page();
+    assert.equal(h.calls.length, 5);
+    for (const table of ['inventory_templates', 'inventory_fields', 'inventory_containers', 'notification_preferences']) {
+      assert.ok(!h.calls.some(call => call.table === table), table);
+    }
+  }
 });
 
 test('category filter includes descendants at every depth before pagination, without including siblings', async () => {

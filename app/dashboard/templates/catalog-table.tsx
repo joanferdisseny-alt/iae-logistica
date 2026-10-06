@@ -1,23 +1,40 @@
 "use client";
 
-import { Fragment, useId, useState, type ReactNode } from "react";
+import { Fragment, useDeferredValue, useId, useState, type ReactNode } from "react";
 
 export type CatalogSummary = {
   id: string;
   label: string;
   cells: ReactNode[];
   details: ReactNode;
+  searchText?: string;
 };
 
-export function CatalogTable({ rows, columns, caption, emptyMessage }: {
+type CatalogTableProps = {
   rows: CatalogSummary[];
   columns: { label: string; className?: string }[];
   caption: string;
   emptyMessage: string;
-}) {
+  searchable?: boolean;
+};
+
+const normalizeSearch = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("es");
+
+function SearchableCatalog(props: CatalogTableProps) {
+  const [query, setQuery] = useState("");
+  const deferred = useDeferredValue(query);
+  const filtered = props.rows.filter(row => normalizeSearch(`${row.label} ${row.searchText ?? ""}`).includes(normalizeSearch(deferred.trim())));
+  return <>
+    <div className="ec-catalog-search"><label className="ec-label">Buscar en este catálogo<input className="ec-input" type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Nombre o código…" /></label><span className="ec-help" role="status">{filtered.length} de {props.rows.length}</span></div>
+    <div aria-busy={query !== deferred}><CatalogTable {...props} rows={filtered} searchable={false} emptyMessage={query ? "No hay coincidencias. Prueba otro nombre o código." : props.emptyMessage} /></div>
+  </>;
+}
+
+export function CatalogTable({ rows, columns, caption, emptyMessage, searchable = false }: CatalogTableProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const prefix = useId();
   const toggle = (id: string) => setSelectedId(current => current === id ? null : id);
+  if (searchable && rows.length) return <SearchableCatalog rows={rows} columns={columns} caption={caption} emptyMessage={emptyMessage} />;
   if (!rows.length) return <p className="ec-muted ec-template-empty">{emptyMessage}</p>;
 
   return <div className="ec-template-table-wrap">

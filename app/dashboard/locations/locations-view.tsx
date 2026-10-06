@@ -11,7 +11,6 @@ import {
 import { QrModal } from "@/app/dashboard/qr-modal";
 import { requireAccess } from "@/lib/auth/context";
 import { CatalogTable } from "../templates/catalog-table";
-import { LocationsSubnav } from "./subnav";
 
 type HeadquartersRow = {
   id: string;
@@ -95,7 +94,7 @@ async function readAll<T>(query: (from: number, to: number) => PromiseLike<{
 function LocationsError({ message, href }: { message: string; href: string }) {
   return (
     <div className="ec-page ec-locations-page">
-      <LocationsSubnav />
+
       <section className="ec-card"><div className="ec-card-body ec-stack">
         <h1 className="ec-h1">Ubicaciones no disponibles</h1>
         <p className="ec-error" role="alert">{message}</p>
@@ -284,7 +283,7 @@ export async function LocationsView({ view }: { view: "containers" | "physical" 
   </section>;
 
   return <div className="ec-page ec-locations-page">
-    <LocationsSubnav />
+
     {view === "containers" ? containersPanel : locationsPanel}
   </div>;
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useId, useState, type ReactNode } from "react";
+import { Fragment, useDeferredValue, useId, useState, type ReactNode } from "react";
 
 export type TemplateSummary = {
   id: string;
@@ -10,17 +10,29 @@ export type TemplateSummary = {
   details: ReactNode;
 };
 
-export function TemplateTable({ rows }: { rows: TemplateSummary[] }) {
+function SearchableTemplates({ rows }: { rows: TemplateSummary[] }) {
+  const [query, setQuery] = useState("");
+  const deferred = useDeferredValue(query);
+  const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("es");
+  const filtered = rows.filter(row => normalize(`${row.name} ${row.category}`).includes(normalize(deferred.trim())));
+  return <>
+    <div className="ec-catalog-search"><label className="ec-label">Buscar tipo de artículo<input className="ec-input" type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Nombre o categoría…" /></label><span className="ec-help" role="status">{filtered.length} de {rows.length}</span></div>
+    <div aria-busy={query !== deferred}>{filtered.length ? <TemplateTable rows={filtered} /> : <p className="ec-template-empty ec-muted">No hay coincidencias. Prueba otro nombre o categoría.</p>}</div>
+  </>;
+}
+
+export function TemplateTable({ rows, searchable = false }: { rows: TemplateSummary[]; searchable?: boolean }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const prefix = useId();
   const toggle = (id: string) => setSelectedId((current) => current === id ? null : id);
-  if (!rows.length) return <p className="ec-muted ec-template-empty">Todavía no hay fichas configuradas. Crea la primera con «Nueva ficha».</p>;
+  if (searchable && rows.length) return <SearchableTemplates rows={rows} />;
+  if (!rows.length) return <p className="ec-muted ec-template-empty">Todavía no hay tipos de artículo. Crea el primero con «Nuevo tipo».</p>;
 
   return <div className="ec-template-table-wrap">
     <table className="ec-table ec-template-table">
-      <caption className="ec-template-caption">Selecciona una ficha para ver sus detalles y gestionar sus campos.</caption>
+      <caption className="ec-template-caption">Selecciona un tipo de artículo para editar su ficha y añadir campos.</caption>
       <colgroup><col className="ec-template-name-column" /><col /><col className="ec-template-count-column" /></colgroup>
-      <thead><tr><th scope="col">Ficha</th><th scope="col">Categoría</th><th scope="col" className="ec-right">Campos</th></tr></thead>
+      <thead><tr><th scope="col">Tipo de artículo</th><th scope="col">Categoría</th><th scope="col" className="ec-right">Campos</th></tr></thead>
       <tbody>{rows.map((row) => {
         const expanded = selectedId === row.id;
         const buttonId = `${prefix}-${row.id}-toggle`;

@@ -71,7 +71,7 @@ test('category page shows full paths and excludes descendants from edit parent c
 test('new and edit category popups offer a root option and preserve the selected parent', () => {
   const actions = new Proxy({}, { get: () => () => {} });
   const forms = load('app/dashboard/templates/forms.tsx', {
-    react: { ...React, useState: () => [true, () => {}], useActionState: () => [undefined, undefined, false] },
+    react: { ...React, useState: initial => [typeof initial === 'boolean' ? true : initial, () => {}], useActionState: () => [undefined, undefined, false] },
     '@/app/dashboard/actions': actions,
     '@/app/dashboard/dialog-focus': { DialogFocus: ({ children }) => children },
     '@/app/dashboard/action-form': { ActionForm: ({ children }) => React.createElement('form', null, children) },

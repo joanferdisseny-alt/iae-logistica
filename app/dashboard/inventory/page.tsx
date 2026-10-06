@@ -1,8 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { CreateItemModal } from "@/app/dashboard/inventory/create-item-modal";
-import { NotificationPreferencesModal } from "@/app/dashboard/inventory/notification-preferences-form";
-import type { InventoryTemplateDefinition } from "@/lib/inventory/templates";
+import { CreateItemModal, InventoryAlertsModal } from "@/app/dashboard/inventory/create-item-modal";
 import { requireAccess } from "@/lib/auth/context";
 import { CatalogTable } from "../templates/catalog-table";
 import { currentInventoryStatus, filterInventoryStatus, inventoryToday } from "@/lib/inventory/expiry-status";
@@ -23,9 +21,6 @@ type InventoryRow = {
   location_id: string | null;
   expiration_date: string | null;
   maintenance_due_at: string | null;
-  inventory_container_items: Array<{
-    inventory_containers: { name: string; code: string | null; location_id: string | null } | null;
-  }> | { inventory_containers: { name: string; code: string | null; location_id: string | null } | null } | null;
   headquarters: {
     name: string;
   } | null;
@@ -43,41 +38,6 @@ type LocationOptionRow = {
   code: string | null;
   headquarters_id: string | null;
   parent_location_id: string | null;
-};
-
-type ContainerOptionRow = {
-  id: string;
-  name: string;
-  code: string | null;
-  headquarters_id: string | null;
-};
-
-type NotificationPreferenceRow = {
-  notification_email: string;
-  expiry_warning_days: number;
-  email_notifications_enabled: boolean;
-};
-
-type TemplateRow = {
-  id: string;
-  code: string;
-  name: string;
-  description: string | null;
-  category_code: string;
-  inventory_categories: {
-    name: string;
-  } | null;
-  inventory_template_fields: Array<{
-    is_required: boolean;
-    allowed_options: string[] | null;
-    sort_order: number;
-    inventory_fields: {
-      field_key: string;
-      label: string;
-      field_type: "text" | "number" | "date" | "textarea" | "select" | "boolean";
-      options: string[];
-    } | null;
-  }>;
 };
 
 function statusBadge(status: string) {
@@ -123,7 +83,7 @@ function InventoryError({ message }: { message: string }) {
 export default async function InventoryPage({ searchParams }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { supabase, user, profile, roleCode, isAdmin } = await requireAccess();
+  const { supabase, profile, roleCode, isAdmin } = await requireAccess();
   if (!profile.is_active || (!isAdmin && !profile.headquarters_id)) {
     return <InventoryError message="Acceso bloqueado: necesitas un perfil activo con sede asignada. Contacta con un administrador." />;
   }
@@ -154,15 +114,13 @@ export default async function InventoryPage({ searchParams }: {
     return `/dashboard/inventory?${values.toString()}`;
   };
   const canManage = ["admin", "editor", "operator"].includes(roleCode);
-  const canConfigureAlerts = isAdmin;
-  const canChooseHeadquarters = isAdmin;
   const userHeadquartersId = profile.headquarters_id;
   const categoriesPromise = readAll((from, to) => supabase.from("inventory_categories")
     .select("code, name, parent_code").order("name").order("code").range(from, to).returns<InventoryCategory[]>());
   const itemsQuery = supabase
     .from("inventory_items")
     .select(
-      "id, name, category, subtype, current_stock, minimum_stock, unit, status, operational_status, location_id, expiration_date, maintenance_due_at, headquarters(name), inventory_container_items(inventory_containers(name, code, location_id))",
+      "id, name, category, subtype, current_stock, minimum_stock, unit, status, operational_status, location_id, expiration_date, maintenance_due_at, headquarters(name)",
       { count: "exact" }
     )
     .order("created_at", { ascending: false })
@@ -180,43 +138,17 @@ export default async function InventoryPage({ searchParams }: {
     .from("locations")
     .select("id, name, code, headquarters_id, parent_location_id")
     .order("name", { ascending: true }).order("id");
-  const containersQuery = supabase
-    .from("inventory_containers")
-    .select("id, name, code, headquarters_id")
-    .order("name", { ascending: true }).order("id");
 
   if (!isAdmin) {
     headquartersQuery.eq("id", userHeadquartersId);
     locationsQuery.eq("headquarters_id", userHeadquartersId);
-    containersQuery.eq("headquarters_id", userHeadquartersId);
   }
 
-  const [
-    itemsResponse,
-    preferencesResponse,
-    templatesResponse,
-    headquartersResponse,
-    locationsResponse,
-    containersResponse,
-    categoriesResponse
-  ] = await Promise.all([
+  const [itemsResponse, headquartersResponse, locationsResponse, categoriesResponse] = await Promise.all([
     category ? categoriesPromise.then(response => itemsQuery
       .in("category", categoryBranch(category, response.data)).returns<InventoryRow[]>()) : itemsQuery.returns<InventoryRow[]>(),
-    supabase
-      .from("notification_preferences")
-      .select("notification_email, expiry_warning_days, email_notifications_enabled")
-      .eq("profile_id", user.id)
-      .maybeSingle<NotificationPreferenceRow>(),
-    readAll((from, to) => supabase
-      .from("inventory_templates")
-      .select(
-        "id, code, name, description, category_code, inventory_categories(name), inventory_template_fields(is_required, allowed_options, sort_order, inventory_fields(field_key, label, field_type, options))"
-      )
-      .order("name", { ascending: true }).order("id").range(from, to)
-      .returns<TemplateRow[]>()),
     readAll((from, to) => headquartersQuery.range(from, to).returns<HeadquartersRow[]>()),
     readAll((from, to) => locationsQuery.range(from, to).returns<LocationOptionRow[]>()),
-    readAll((from, to) => containersQuery.range(from, to).returns<ContainerOptionRow[]>()),
     categoriesPromise
   ]);
 
@@ -235,9 +167,8 @@ export default async function InventoryPage({ searchParams }: {
     }
   }
   const failures = [
-    ["artículos", itemsResponse.error], ["preferencias de avisos", preferencesResponse.error],
-    ["plantillas", templatesResponse.error], ["sedes", headquartersResponse.error],
-    ["ubicaciones", locationsResponse.error], ["cajas", containersResponse.error],
+    ["artículos", itemsResponse.error], ["sedes", headquartersResponse.error],
+    ["ubicaciones", locationsResponse.error],
     ["categorías", categoriesResponse.error]
   ] as const;
   const failed = failures.filter(([, error]) => error);
@@ -268,10 +199,8 @@ export default async function InventoryPage({ searchParams }: {
   const totalItems = itemsResponse.count;
   const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
   if (page > totalPages) redirect(pageHref(totalPages));
-  const templates = templatesResponse.data;
   const headquarters = headquartersResponse.data;
   const locations = locationsResponse.data;
-  const containers = containersResponse.data;
   const categories = categoryOptions(categoriesResponse.data);
   const locationsById = new Map(locations.map((location) => [location.id, location]));
   const locationPath = (id: string | null) => {
@@ -292,111 +221,33 @@ export default async function InventoryPage({ searchParams }: {
     const container = stock.inventory_containers;
     return `${stock.quantity} ${item.unit ?? 'uds.'} · ${container ? `Caja: ${container.name} > ${locationPath(container.location_id)}` : locationPath(stock.location_id)}`;
   }).join("; ") || "Sin existencias";
-  const lowStock = items.filter((item) => item.status === "low").length;
-  const expiring = items.filter((item) => item.expiration_date).length;
-  const preferences = preferencesResponse.data;
-  const templateDefinitions: InventoryTemplateDefinition[] = (templates ?? []).map((template) => ({
-    id: template.id,
-    code: template.code,
-    name: template.name,
-    category: template.category_code,
-    categoryName: categories.find(category => category.code === template.category_code)?.name ?? template.inventory_categories?.name ?? template.category_code,
-    description: template.description ?? "",
-    fields: (template.inventory_template_fields ?? [])
-      .sort((a, b) => a.sort_order - b.sort_order)
-      .filter((field) => field.inventory_fields)
-      .map((field) => ({
-        key: field.inventory_fields?.field_key ?? "",
-        label: field.inventory_fields?.label ?? "",
-        type: field.inventory_fields?.field_type ?? "text",
-        required: field.is_required,
-        options: (field.inventory_fields?.options ?? []).filter(option => !field.allowed_options || field.allowed_options.includes(option))
-      }))
-  }));
 
   return (
     <div className="ec-page ec-inventory-page">
-      <section className="ec-card ec-hero-card">
-        <div className="ec-card-body ec-stack">
-          <div className="ec-row ec-row-between ec-row-wrap">
-            <div className="ec-col">
-              <div className="ec-muted-2">Inventario</div>
-              <h1 className="ec-h1">Herramientas, materiales y consumibles</h1>
-            </div>
-            <span className="ec-badge ec-badge-neutral">
-              {canManage ? "Edición habilitada" : "Solo lectura"}
-            </span>
-          </div>
-          <p className="ec-muted">
-            Listado operativo del almacén con visibilidad sobre stock, ubicación y
-            eventos que requieren atención.
-          </p>
-          <div className="ec-stat-grid">
-            <article className="ec-stat">
-              <strong>{totalItems}</strong>
-              artículos que coinciden con los filtros
-            </article>
-            <article className="ec-stat">
-              <strong>{lowStock}</strong>
-              en stock bajo en esta página
-            </article>
-            <article className="ec-stat">
-              <strong>{expiring}</strong>
-              con fecha de caducidad en esta página
-            </article>
-          </div>
-          <div className="ec-inline-notes">
-            <span className="ec-badge ec-badge-neutral">
-              {!preferences ? "Avisos sin configurar" : preferences.email_notifications_enabled
-                ? "Avisos email activos"
-                : "Avisos email pausados"}
-            </span>
-            <span className="ec-help">
-              {preferences ? `Antelación actual: ${preferences.expiry_warning_days} días` : "Configura las preferencias para activar los avisos."}
-            </span>
-          </div>
-        </div>
-      </section>
-
       <section className="ec-card">
         <div className="ec-card-header">
-          <h2 className="ec-h2">Listado</h2>
-          {canManage ? (
-            <div className="ec-actions">
-              {canConfigureAlerts ? (
-                <NotificationPreferencesModal
-                  initialValues={{
-                    expiryWarningDays: preferences?.expiry_warning_days ?? 14,
-                    emailEnabled: preferences?.email_notifications_enabled ?? true,
-                    notificationEmail: preferences?.notification_email ?? user.email ?? ""
-                  }}
-                />
-              ) : null}
-              <Link className="ec-btn" href="/dashboard/receiving">Recibir material / código de barras</Link>
-              <CreateItemModal
-                canChooseHeadquarters={canChooseHeadquarters}
-                containers={(containers ?? []).map((container) => ({
-                  id: container.id,
-                  headquarters_id: container.headquarters_id,
-                  name: container.code ? `${container.name} · ${container.code}` : container.name
-                }))}
-                headquarters={(headquarters ?? []).filter((headquarter) => headquarter.is_active)}
-                locations={(locations ?? []).map((location) => ({
-                  id: location.id,
-                  headquarters_id: location.headquarters_id,
-                  name: locationPath(location.id)
-                }))}
-                templates={templateDefinitions}
-                userHeadquartersId={profile?.headquarters_id ?? null}
-              />
-            </div>
-          ) : null}
+          <div className="ec-col">
+            <div className="ec-row ec-row-wrap"><h1 className="ec-h1">Artículos</h1><span className="ec-badge ec-badge-neutral">{totalItems}</span></div>
+            <span className="ec-help">Existencias, estado y ubicación de cada recurso.</span>
+          </div>
+          {canManage && <div className="ec-actions">
+            <details className="ec-inventory-tools"><summary className="ec-btn">Otras acciones</summary><div className="ec-stack">
+              <Link className="ec-btn" href="/dashboard/receiving">Recibir material</Link>
+              {isAdmin && <Link className="ec-btn" href="/dashboard/imports">Importar stock</Link>}
+              {isAdmin && <InventoryAlertsModal />}
+            </div></details>
+            <CreateItemModal />
+          </div>}
         </div>
         <div className="ec-card-body ec-stack">
-          <form action="/dashboard/inventory" method="get" className="ec-inventory-filters">
+          <form action="/dashboard/inventory" method="get" className="ec-inventory-search">
             <label className="ec-label">Buscar por nombre
               <input className="ec-input" name="q" type="search" defaultValue={q} maxLength={120} placeholder="Nombre del artículo" />
             </label>
+            <button className="ec-btn ec-btn-primary ec-search-submit" type="submit">Buscar</button>
+            <details className="ec-inventory-filter-panel" open={Boolean(category || status || operationalStatus || (isAdmin && headquartersFilter))}>
+              <summary>Filtros de categoría, estado y sede</summary>
+              <div className="ec-inventory-filters">
             <label className="ec-label">Categoría
               <select className="ec-select" name="category" defaultValue={category}>
                 <option value="">Todas</option>
@@ -428,10 +279,12 @@ export default async function InventoryPage({ searchParams }: {
               <button className="ec-btn ec-btn-primary" type="submit">Filtrar</button>
               <Link className="ec-btn" href="/dashboard/inventory">Limpiar</Link>
             </div>
+              </div>
+            </details>
           </form>
           <p className="ec-help" role="status">
             {totalItems ? `${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, totalItems)} de ${totalItems} artículos` : "0 artículos con estos filtros"}.
-            {" "}Los indicadores de stock bajo y caducidad corresponden solo a los {items.length} artículos de esta página, no al total.
+            {" "}La búsqueda se realiza en todo el inventario accesible, no solo en esta página.
           </p>
           <div className="ec-inventory-catalog">
             <CatalogTable

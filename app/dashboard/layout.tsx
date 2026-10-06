@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { signOut } from "@/app/auth/actions";
 import { DashboardShell } from "@/app/dashboard/shell";
 import { requirePersonalAccess } from "@/lib/auth/context";
+import "./workspace.css";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
