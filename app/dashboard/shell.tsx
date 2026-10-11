@@ -4,20 +4,8 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { currentWorkspaceLink, workspaceAreas } from "@/lib/navigation";
-
-function Icon({ name }: { name: string }) {
-  const paths: Record<string, string> = {
-    home: "M3 11 12 3l9 8M5 10v11h14V10M9 21v-7h6v7",
-    box: "m3 7 9-4 9 4v10l-9 4-9-4V7Zm0 0 9 5 9-5M12 12v9",
-    pin: "M18 10c0 5-6 11-6 11S6 15 6 10a6 6 0 1 1 12 0ZM10 10h4",
-    users: "M3 21v-2a5 5 0 0 1 10 0v2M8 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M17 4a4 4 0 0 1 0 8M17 15a5 5 0 0 1 4 5",
-    settings: "M4 6h16M4 12h16M4 18h16M8 3v6M16 9v6M10 15v6",
-    logout: "M9 3H4v18h5M13 8l5 4-5 4M8 12h12",
-    panel: "M3 4h18v16H3V4ZM9 4v16",
-    menu: "M4 6h16M4 12h16M4 18h16"
-  };
-  return <svg className="ec-nav-icon" aria-hidden="true" fill="none" viewBox="0 0 24 24"><path d={paths[name] ?? paths.box} /></svg>;
-}
+import { Icon, type IconName } from "./icons";
+import { QuickNavigation } from "./quick-navigation";
 
 export function DashboardShell({ children, roleCode, roleName, signOutAction, userLabel }: {
   children: ReactNode; roleCode: string; roleName: string; signOutAction: () => Promise<void>; userLabel: string;
@@ -31,6 +19,15 @@ export function DashboardShell({ children, roleCode, roleName, signOutAction, us
   const tabs = useRef<HTMLElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const home = roleCode === "volunteer" ? "/dashboard/personal" : "/dashboard";
+  const shortcuts: { href: string; label: string; icon: IconName }[] = roleCode === "volunteer" ? [
+    { href: "/dashboard/personal", label: "Mi material", icon: "personal" },
+    { href: "/dashboard/requests", label: "Solicitudes", icon: "request" }
+  ] : [
+    { href: home, label: "Inicio", icon: "home" },
+    { href: "/dashboard/catalog", label: "Catálogo", icon: "catalog" },
+    { href: "/dashboard/locations", label: "Cajas", icon: "box" },
+    { href: "/dashboard/personal", label: "Mi material", icon: "personal" }
+  ];
 
   useEffect(() => {
     try { setCollapsed(localStorage.getItem("iae-sidebar-collapsed") === "true"); } catch {}
@@ -53,11 +50,12 @@ export function DashboardShell({ children, roleCode, roleName, signOutAction, us
   }, [menuOpen]);
 
   const closeMenu = () => drawer.current?.close();
+  const openMenu = () => { drawer.current?.showModal(); setMenuOpen(true); };
   const navigation = (mobile: boolean) => <>
     <div className="ec-erp-brand">
       <Link href={home} onClick={closeMenu} aria-label="IAE Logística, inicio"><img src="/logo_iae.png" alt="IAE Rescue" width="64" height="48" /></Link>
       <div className="ec-erp-brand-copy"><strong>IAE</strong><span>Logística y recursos</span></div>
-      {mobile ? <button className="ec-erp-icon-button" type="button" onClick={closeMenu} aria-label="Cerrar menú">✕</button> :
+      {mobile ? <button className="ec-erp-icon-button" type="button" onClick={closeMenu} aria-label="Cerrar menú"><Icon name="close" /></button> :
         <button type="button" className="ec-erp-icon-button ec-erp-collapse" aria-label={collapsed ? "Ampliar menú" : "Reducir menú"} aria-expanded={!collapsed}
           onClick={() => { const next = !collapsed; setCollapsed(next); try { localStorage.setItem("iae-sidebar-collapsed", String(next)); } catch {} }}><Icon name="panel" /></button>}
     </div>
@@ -72,11 +70,11 @@ export function DashboardShell({ children, roleCode, roleName, signOutAction, us
         return <div className="ec-erp-nav-group" key={area.id}>
           <button type="button" className={`ec-erp-nav-heading ${active ? "is-active" : ""}`} aria-expanded={open} aria-controls={id} title={area.label}
             onClick={() => { if (!mobile && collapsed) { setCollapsed(false); try { localStorage.setItem("iae-sidebar-collapsed", "false"); } catch {} } setExpanded(open ? "" : area.id); }}>
-            <Icon name={area.icon} /><span>{area.label}</span><span className="ec-erp-chevron" aria-hidden="true">{open ? "−" : "+"}</span>
+            <Icon name={area.icon} /><span>{area.label}</span><Icon name="chevron" className={`ec-erp-chevron ${open ? "is-open" : ""}`} />
           </button>
           <div id={id} className="ec-erp-nav-children" hidden={!open}>
             {area.links.map(link => <Link key={link.href} href={link.href} prefetch={false} onClick={closeMenu}
-              aria-current={link.href === current?.link.href ? "page" : undefined}>{link.label}</Link>)}
+              aria-current={link.href === current?.link.href ? "page" : undefined}><Icon name={link.icon ?? "list"} /><span>{link.label}</span></Link>)}
           </div>
         </div>;
       })}
@@ -97,14 +95,21 @@ export function DashboardShell({ children, roleCode, roleName, signOutAction, us
     <main className="ec-main" id="workspace" tabIndex={-1}>
       <header className="ec-erp-topbar">
         <button type="button" className="ec-erp-mobile-toggle ec-btn" aria-label="Abrir menú" aria-haspopup="dialog" aria-expanded={menuOpen}
-          onClick={() => { drawer.current?.showModal(); setMenuOpen(true); }}><Icon name="menu" /></button>
+          onClick={openMenu}><Icon name="menu" /></button>
         <nav aria-label="Ruta de navegación" className="ec-erp-breadcrumb"><Link href={home}>IAE</Link><span aria-hidden="true">/</span><span>{current?.area.label ?? "Inicio"}</span>{current && <><span aria-hidden="true">/</span><strong>{current.link.label}</strong></>}</nav>
-        <span className="ec-erp-role">{roleName}</span>
+        <div className="ec-erp-topbar-actions"><QuickNavigation roleCode={roleCode} /><span className="ec-erp-role">{roleName}</span></div>
       </header>
       {current && current.area.links.length > 1 && <nav className="ec-erp-tabs" ref={tabs} aria-label={current.area.label}>
         {current.area.links.map(link => <Link key={link.href} href={link.href} prefetch={false} aria-current={link.href === current.link.href ? "page" : undefined}>{link.label}</Link>)}
       </nav>}
       <div className="ec-main-inner">{children}</div>
     </main>
+    <nav className="ec-mobile-dock" aria-label="Accesos rápidos">
+      {shortcuts.map(link => <Link key={link.href} href={link.href} prefetch={false}
+        aria-current={pathname === link.href || current?.link.href === link.href || (link.href === "/dashboard/catalog" && current?.area.id === "catalog") ? "page" : undefined}>
+        <Icon name={link.icon} /><span>{link.label}</span>
+      </Link>)}
+      <button type="button" onClick={openMenu} aria-haspopup="dialog" aria-expanded={menuOpen} aria-label="Abrir todas las secciones"><Icon name="menu" /><span>Menú</span></button>
+    </nav>
   </div>;
 }

@@ -211,6 +211,7 @@ export async function LocationsView({ view }: { view: "containers" | "physical" 
       </LocationModal>}
     </div>
     <CatalogTable
+      searchable
       columns={[{ label: "Caja / kit", className: "ec-field-name-column" }, { label: "Tipo", className: "ec-field-type-column" }, { label: "Sede" }]}
       caption="Selecciona una caja para ver su contenido, ubicación y acciones."
       emptyMessage="Todavía no hay cajas creadas."
@@ -218,6 +219,7 @@ export async function LocationsView({ view }: { view: "containers" | "physical" 
         const assignedItems = itemsByContainer.get(container.id) ?? [];
         return {
           id: container.id, label: container.name,
+          searchText: `${container.code ?? ""} ${container.headquarters?.name ?? ""} ${locationPath(container.location_id)}`,
           cells: [containerTypeLabels[container.container_type] ?? container.container_type, container.headquarters?.name ?? "Sede no accesible"],
           details: <div className="ec-stack">
             <div className="ec-template-detail-heading">
@@ -261,11 +263,13 @@ export async function LocationsView({ view }: { view: "containers" | "physical" 
       </LocationModal>}
     </div>
     <CatalogTable
+      searchable
       columns={[{ label: "Ubicación", className: "ec-field-name-column" }, { label: "Tipo", className: "ec-field-type-column" }, { label: "Sede" }]}
       caption="Selecciona una ubicación para ver su jerarquía, descripción y acciones."
       emptyMessage="Todavía no hay ubicaciones físicas. Crea armarios, estanterías o vehículos."
       rows={locations.map(location => ({
         id: location.id, label: location.name,
+        searchText: `${location.code ?? ""} ${location.headquarters?.name ?? ""} ${locationPath(location.id)}`,
         cells: [locationTypeLabels[location.location_type] ?? location.location_type, location.headquarters?.name ?? "Sede no accesible"],
         details: <div className="ec-template-detail-heading">
           <div className="ec-template-description">

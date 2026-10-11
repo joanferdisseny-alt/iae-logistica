@@ -29,7 +29,7 @@ export function TemplateTable({ rows, searchable = false }: { rows: TemplateSumm
   if (!rows.length) return <p className="ec-muted ec-template-empty">Todavía no hay tipos de artículo. Crea el primero con «Nuevo tipo».</p>;
 
   return <div className="ec-template-table-wrap">
-    <table className="ec-table ec-template-table">
+    <table className="ec-table ec-template-table" data-columns="3">
       <caption className="ec-template-caption">Selecciona un tipo de artículo para editar su ficha y añadir campos.</caption>
       <colgroup><col className="ec-template-name-column" /><col /><col className="ec-template-count-column" /></colgroup>
       <thead><tr><th scope="col">Tipo de artículo</th><th scope="col">Categoría</th><th scope="col" className="ec-right">Campos</th></tr></thead>
@@ -49,8 +49,8 @@ export function TemplateTable({ rows, searchable = false }: { rows: TemplateSumm
                 <span>{row.name}</span>
               </button>
             </th>
-            <td><span className="ec-template-category">{row.category}</span></td>
-            <td className="ec-right"><span className="ec-template-count">{row.fieldCount}</span></td>
+            <td data-label="Categoría"><span className="ec-template-category">{row.category}</span></td>
+            <td data-label="Campos" className="ec-right"><span className="ec-template-count">{row.fieldCount}</span></td>
           </tr>
           <tr id={detailsId} hidden={!expanded} className="ec-template-expanded-row">
             <td colSpan={3}>{expanded && <section className="ec-template-detail" aria-labelledby={buttonId}>{row.details}</section>}</td>

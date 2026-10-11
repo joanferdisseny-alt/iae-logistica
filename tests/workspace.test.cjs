@@ -14,6 +14,8 @@ function load(path, mocks = {}) {
   return module.exports;
 }
 const navigation = load('lib/navigation.ts');
+const icons = load('app/dashboard/icons.tsx');
+const Link = ({ children, prefetch, ...props }) => React.createElement('a', { ...props, 'data-prefetch': String(prefetch) }, children);
 test('four ERP areas preserve every operational route and isolate volunteer navigation', () => {
   const areas = navigation.workspaceAreas('admin');
   assert.deepEqual(Array.from(areas, area => area.id), ['catalog', 'warehouse', 'people', 'settings']);
@@ -38,17 +40,31 @@ test('deep item and QR routes activate the right area without changing their URL
   assert.equal(navigation.currentWorkspaceLink(areas, '/dashboard'), undefined);
 });
 test('shell exposes accessible mobile dialog and only permitted tabs, without eager link prefetch', () => {
+  const quickNavigation = load('app/dashboard/quick-navigation.tsx', { '@/lib/navigation': navigation, './icons': icons, 'next/link': Link });
   const { DashboardShell } = load('app/dashboard/shell.tsx', {
     '@/lib/navigation': navigation,
-    'next/link': ({ children, prefetch, ...props }) => React.createElement('a', { ...props, 'data-prefetch': String(prefetch) }, children),
+    './icons': icons, './quick-navigation': quickNavigation,
+    'next/link': Link,
     'next/navigation': { usePathname: () => '/dashboard/templates/fields' }
   });
   const html = role => renderToStaticMarkup(React.createElement(DashboardShell, { roleCode: role, roleName: role, userLabel: 'Persona de prueba', signOutAction: async () => {}, children: 'Contenido' }));
   assert.match(html('admin'), /<dialog[^>]*aria-label="Navegación"/);
   assert.match(html('admin'), /aria-current="page"[^>]*>Campos/);
   assert.match(html('admin'), /data-prefetch="false"/);
+  assert.match(html('admin'), /aria-label="Accesos rápidos"/);
+  assert.match(html('admin'), /aria-label="Ir a una sección"/);
   assert.doesNotMatch(html('reader'), /href="\/dashboard\/(templates|users|imports|headquarters)/);
   assert.doesNotMatch(html('volunteer'), /href="\/dashboard\/(inventory|locations|receiving|users)/);
+});
+
+test('section search handles accents and words in any order without exposing restricted links', () => {
+  assert.equal(navigation.searchWorkspaceLinks('admin', 'catalogo categorias')[0].href, '/dashboard/templates/categories');
+  assert.equal(navigation.searchWorkspaceLinks('admin', 'permisos usuarios')[0].href, '/dashboard/users');
+  assert.equal(navigation.searchWorkspaceLinks('reader', 'usuarios').length, 0);
+  assert.equal(navigation.searchWorkspaceLinks('editor', 'campos').length, 0);
+  assert.equal(navigation.searchWorkspaceLinks('volunteer', 'inventario').length, 0);
+  assert.deepEqual(Array.from(navigation.searchWorkspaceLinks('volunteer', ''), link => link.href), ['/dashboard/personal', '/dashboard/requests']);
+  assert.equal(navigation.searchWorkspaceLinks('admin', '   ').length, 15);
 });
 
 function optionsHarness(role = 'admin', failTable) {

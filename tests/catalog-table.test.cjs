@@ -39,6 +39,9 @@ for (const kind of ['fields', 'categories']) {
     const render = harness();
     const tree = render(props);
     assert.match(renderToStaticMarkup(tree), /<table/);
+    assert.equal(findAll(tree, node => node.type === 'table')[0].props['data-columns'], props.columns.length);
+    assert.deepEqual(findAll(tree, node => node.type === 'td' && node.props['data-label']).map(node => node.props['data-label']),
+      props.rows.flatMap(() => props.columns.slice(1).map(column => column.label)));
     assert.doesNotMatch(renderToStaticMarkup(tree), /Editar/);
     assert.equal(buttons(tree).length, 2);
     assert.ok(details(tree).every(row => row.props.hidden));
@@ -52,6 +55,8 @@ for (const kind of ['fields', 'categories']) {
     assert.equal(buttons(open)[0].props['aria-controls'], details(open)[0].props.id);
     assert.equal(details(open)[0].props.children.props.colSpan, props.columns.length);
     const summaries = findAll(open, node => node.type === 'tr' && node.props.className?.startsWith('ec-template-summary'));
+    summaries[1].props.onClick({ target: { closest: () => ({ tagName: 'A' }) } });
+    assert.deepEqual(details(render(props)).map(row => row.props.hidden), [false, true]);
     summaries[1].props.onClick();
     assert.deepEqual(details(render(props)).map(row => row.props.hidden), [true, false]);
     const refreshed = { ...props, rows: props.rows.map(row => ({ ...row, label: row.label + ' actualizado' })) };

@@ -14,7 +14,7 @@ function load(file, mocks = {}) {
   return module.exports;
 }
 const all = node => Array.isArray(node) ? node.flatMap(all) : !node || typeof node !== 'object' ? [] : [node, ...all(node.props?.children)];
-const Link = ({ children, ...props }) => React.createElement('a', props, children);
+const Link = ({ children, prefetch, ...props }) => React.createElement('a', props, children);
 
 test('public landing explains current roles without promising editor stock mutations', () => {
   const Page = load('app/page.tsx', { 'next/link': Link }).default;
@@ -28,6 +28,7 @@ test('dashboard only offers administration to admins and exposes operational sec
   for (const role of ['admin', 'editor', 'reader']) {
     const page = load('app/dashboard/page.tsx', {
       'next/link': Link,
+      './icons': load('app/dashboard/icons.tsx'),
       '@/lib/auth/context': { requireAccess: async () => ({ isAdmin: role === 'admin' }) }
     }).default;
     const html = renderToStaticMarkup(await page());
@@ -37,6 +38,10 @@ test('dashboard only offers administration to admins and exposes operational sec
     for (const route of ['inventory', 'locations', 'requests', 'receiving', 'checklists']) {
       assert.ok(html.includes(`href="/dashboard/${route}"`));
     }
+    assert.match(html, /Panel de trabajo/);
+    assert.match(html, /href="\/dashboard\/inventory\?status=low"/);
+    assert.match(html, /href="\/dashboard\/inventory\?status=expired"/);
+    assert.match(html, /href="\/dashboard\/inventory\?operational_status=repair"/);
   }
 });
 

@@ -23,7 +23,7 @@ function harness({ admin = true, active = true, headquartersId = 'hq', rows = {}
   const calls = [];
   const data = { headquarters: [{ id: 'hq', name: 'Valencia', is_active: true }], locations: [location], inventory_containers: [box], inventory_container_items: [{ id: 'entry', container_id: 'box', quantity: 4, notes: 'Acero', inventory_items: { id: 'drill', name: 'Brocas', unit: 'uds.' } }], ...rows };
   const CatalogTable = load('app/dashboard/templates/catalog-table.tsx', { react: {
-    ...React, useId: () => 'locations', useState: () => [selected, value => { selected = typeof value === 'function' ? value(selected) : value; }]
+    ...React, useId: () => 'locations', useState: initial => initial === '' ? React.useState(initial) : [selected, value => { selected = typeof value === 'function' ? value(selected) : value; }]
   } }).CatalogTable;
   const button = label => () => React.createElement('button', null, label);
   const view = load('app/dashboard/locations/locations-view.tsx', {
@@ -69,6 +69,7 @@ test('location navigation uses independent routes and the same subnav styling as
 test('boxes render one compact table and expand to quantities, hierarchy, QR, checklists and admin actions', async () => {
   const h = harness(); const page = await h.view({ view: 'containers' }); const props = h.table(page).props;
   assert.equal(props.rows.length, 1); assert.equal(props.columns[0].label, 'Caja / kit');
+  assert.equal(props.searchable, true); assert.match(props.rows[0].searchText, /K1.*Valencia.*Estanteria/);
   let html = renderToStaticMarkup(h.render(props));
   assert.match(html, /<table/); assert.doesNotMatch(html, /Brocas|Editar caja|QR de caja/);
   h.select('box'); html = renderToStaticMarkup(h.render(props));
@@ -81,6 +82,7 @@ test('physical locations have their own table and do not fetch box contents', as
   const h = harness({ failTable: 'inventory_containers' });
   const page = await h.view({ view: 'physical' }); const props = h.table(page).props;
   assert.equal(props.columns[0].label, 'Ubicación');
+  assert.equal(props.searchable, true); assert.match(props.rows[0].searchText, /E1.*Valencia/);
   assert.ok(!h.calls.some(c => c.from !== undefined && ['inventory_containers', 'inventory_container_items'].includes(c.table)));
   h.select('shelf'); const html = renderToStaticMarkup(h.render(props));
   assert.match(html, /Ruta completa/); assert.match(html, /Editar ubicacion/); assert.match(html, /Eliminar ubicacion/);

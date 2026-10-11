@@ -38,7 +38,7 @@ export function CatalogTable({ rows, columns, caption, emptyMessage, searchable 
   if (!rows.length) return <p className="ec-muted ec-template-empty">{emptyMessage}</p>;
 
   return <div className="ec-template-table-wrap">
-    <table className="ec-table ec-template-table">
+    <table className="ec-table ec-template-table" data-columns={columns.length}>
       <caption className="ec-template-caption">{caption}</caption>
       <colgroup>{columns.map(column => <col key={column.label} className={column.className} />)}</colgroup>
       <thead><tr>{columns.map(column => <th key={column.label} scope="col">{column.label}</th>)}</tr></thead>
@@ -47,7 +47,11 @@ export function CatalogTable({ rows, columns, caption, emptyMessage, searchable 
         const buttonId = `${prefix}-${row.id}-toggle`;
         const detailsId = `${prefix}-${row.id}-details`;
         return <Fragment key={row.id}>
-          <tr className={`ec-template-summary${expanded ? " is-expanded" : ""}`} onClick={() => toggle(row.id)}>
+          <tr className={`ec-template-summary${expanded ? " is-expanded" : ""}`} onClick={event => {
+            const target = event?.target as HTMLElement | undefined;
+            if (target?.closest?.("button, a, input, select, textarea, label")) return;
+            toggle(row.id);
+          }}>
             <th scope="row">
               <button id={buttonId} type="button" className="ec-template-toggle" aria-expanded={expanded} aria-controls={detailsId}
                 onClick={event => { event.stopPropagation(); toggle(row.id); }}>
@@ -57,7 +61,7 @@ export function CatalogTable({ rows, columns, caption, emptyMessage, searchable 
                 <span>{row.label}</span>
               </button>
             </th>
-            {row.cells.map((cell, index) => <td key={columns[index + 1].label}><span className="ec-template-category">{cell}</span></td>)}
+            {row.cells.map((cell, index) => <td key={columns[index + 1].label} data-label={columns[index + 1].label}><span className="ec-template-category">{cell}</span></td>)}
           </tr>
           <tr id={detailsId} hidden={!expanded} className="ec-template-expanded-row">
             <td colSpan={columns.length}>{expanded && <section className="ec-template-detail" aria-labelledby={buttonId}>{row.details}</section>}</td>
