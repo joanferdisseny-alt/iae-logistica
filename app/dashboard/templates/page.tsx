@@ -33,7 +33,7 @@ async function readCatalog<T>(query: (from: number, to: number) => PromiseLike<{
   }
 }
 
-export default async function TemplatesPage() {
+export default async function TemplatesPage(props: { searchParams?: Promise<{ category?: string }> }) {
   const { supabase, isAdmin } = await requireAccess();
   if (!isAdmin) redirect("/dashboard");
 
@@ -46,18 +46,20 @@ export default async function TemplatesPage() {
   ]);
   const options = categoryOptions(categories);
   const categoryNames = new Map(options.map(category => [category.code, category.name]));
+  const requestedCategory = (await props?.searchParams)?.category;
+  const initialCategory = options.some(category => category.code === requestedCategory) ? requestedCategory : undefined;
 
   return <div className="ec-page">
 
     <section className="ec-card">
       <div className="ec-card-header ec-row-wrap">
         <div className="ec-row ec-row-wrap">
-          <h1 className="ec-h2">Tipos de artículo</h1>
+          <h1 className="ec-h2">Plantillas de producto</h1>
           <span className="ec-badge ec-badge-neutral">{templates.length}</span>
         </div>
-        <CreateTemplateModal categories={options} />
+        <CreateTemplateModal categories={options} categoryCode={initialCategory} />
       </div>
-      <p className="ec-section-intro">Un tipo define qué campos tendrá un artículo: por ejemplo, «Taladro» o «Pantalón». Aquí configuras el formulario; las unidades reales se gestionan en <Link href="/dashboard/inventory">Artículos</Link>.</p>
+      <p className="ec-section-intro">Una plantilla define los campos de un producto: por ejemplo, «Taladro» o «Pantalón». Solo administración configura estos formularios. Los artículos y sus existencias se gestionan en <Link href="/dashboard/catalog">Productos</Link>.</p>
       <TemplateTable searchable rows={templates.map((template) => {
         const assignedFields = (template.inventory_template_fields ?? [])
           .filter((assignment) => assignment.inventory_fields)

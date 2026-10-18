@@ -6,6 +6,7 @@ import { CatalogTable } from "../templates/catalog-table";
 import { currentInventoryStatus, filterInventoryStatus, inventoryToday } from "@/lib/inventory/expiry-status";
 import { categoryBranch, categoryOptions, type InventoryCategory } from "@/lib/inventory/categories";
 import { sizeTotals, type SizeVariant } from "@/lib/inventory/size-catalog";
+import { CatalogViews } from "../catalog/catalog-views";
 
 export const dynamic = "force-dynamic";
 
@@ -242,7 +243,7 @@ export default async function InventoryPage({ searchParams }: {
       <section className="ec-card">
         <div className="ec-card-header">
           <div className="ec-col">
-            <div className="ec-row ec-row-wrap"><h1 className="ec-h1">Artículos</h1><span className="ec-badge ec-badge-neutral">{totalItems}</span></div>
+            <div className="ec-row ec-row-wrap"><h1 className="ec-h1">Productos</h1><span className="ec-badge ec-badge-neutral">{totalItems}</span></div>
             <span className="ec-help">Existencias, estado y ubicación de cada recurso. Las tallas de una prenda se reúnen en una sola ficha por sede.</span>
           </div>
           {canManage && <div className="ec-actions">
@@ -251,9 +252,10 @@ export default async function InventoryPage({ searchParams }: {
               {isAdmin && <Link className="ec-btn" href="/dashboard/imports">Importar stock</Link>}
               {isAdmin && <InventoryAlertsModal />}
             </div></details>
-            <CreateItemModal />
+            <CreateItemModal categoryCode={category || undefined} headquartersId={headquartersFilter || undefined} />
           </div>}
         </div>
+        <CatalogViews view="list" category={category} headquarters={isAdmin ? headquartersFilter ?? "" : ""} q={q} />
         <div className="ec-card-body ec-stack">
           <form action="/dashboard/inventory" method="get" className="ec-inventory-search">
             <label className="ec-label">Buscar por nombre

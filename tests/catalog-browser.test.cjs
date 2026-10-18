@@ -74,7 +74,7 @@ test('category tree expands the current path, has mobile controls and shows cate
 function harness({role='admin',active=true,rows={},failTable,failAfterPage,overflow=false}={}) {
   const calls=[];
   const data={inventory_categories:categories,headquarters:[{id:site,name:'Valencia'},{id:foreign,name:'Navarra'}],inventory_catalog_items:[product,{...product,id:'other-site',headquarters_id:foreign}],...rows};
-  const context={isAdmin:role==='admin',profile:{is_active:active,headquarters_id:site},supabase:{from(table){
+  const context={isAdmin:role==='admin',roleCode:role,profile:{is_active:active,headquarters_id:site},supabase:{from(table){
     const call={table,filters:[],orders:[],from:0,to:499,head:false}; calls.push(call);
     const result=()=>{
       if (table===failTable && (!failAfterPage || call.from>=500)) return {data:null,count:null,error:{code:'OFFLINE'}};
@@ -99,22 +99,40 @@ function harness({role='admin',active=true,rows={},failTable,failAfterPage,overf
     '@/lib/read-all':load('lib/read-all.ts'), '@/lib/inventory/categories':load('lib/inventory/categories.ts'),
     '@/lib/inventory/catalog-browser':model,'@/lib/inventory/size-catalog':load('lib/inventory/size-catalog.ts'),
     './category-tree':{CategoryTree:()=>null}
+    ,'./catalog-views':{CatalogViews:()=>null}
+    ,'../inventory/create-item-modal':{CreateItemModal:props=>React.createElement('button',{'data-category':props.categoryCode,'data-site':props.headquartersId},'Nuevo artículo')}
+    ,'../templates/forms':{CreateCategoryModal:()=>null}
   }).default;
   return {calls,page:params=>page({searchParams:Promise.resolve(params??{})})};
 }
 
-test('root and intermediate folders show only child categories without querying products',async()=>{
+test('intermediate folders never fetch product rows, but count direct assignments to avoid silently hiding them',async()=>{
   for(const category of ['', 'uniformity', 'first']){
     const h=harness({failTable:'inventory_catalog_items'});
     const tree=await h.page({category,q:'MONO',page:'8',headquarters:site});
     const html=renderToStaticMarkup(tree);
     assert.match(html,/ec-catalog-folder/);assert.match(html,/categoría final/);
-    assert.doesNotMatch(html,/ec-catalog-products|role="status"|Paginación del catálogo|name="q"|No hay artículos|role="alert"/);
-    assert.equal(h.calls.length,2,'Intermediate folders do not count or fetch articles');
-    assert.ok(!h.calls.some(c=>c.table==='inventory_catalog_items'));
+    assert.doesNotMatch(html,/ec-catalog-products|Paginación del catálogo|name="q"|No hay artículos|role="alert"/);
+    assert.equal(h.calls.length,category ? 3 : 2);
+    assert.ok(h.calls.filter(c=>c.table==='inventory_catalog_items').every(c=>c.head));
+    if(category) assert.match(html,/No se pudieron comprobar/);
     const folder=all(tree).find(n=>n.props?.className==='ec-catalog-folder');
     const params=new URL(folder.props.href,'https://local.invalid').searchParams;
     assert.equal(params.get('q'),null);assert.equal(params.get('page'),null);assert.equal(params.get('headquarters'),site);
+  }
+});
+
+test('direct products in intermediate folders remain accessible with site-scoped notice and contextual creation',async()=>{
+  const h=harness({rows:{inventory_catalog_items:[{...product,category:'first'},{...product,id:'foreign',category:'first',headquarters_id:foreign}]}});
+  const html=renderToStaticMarkup(await h.page({category:'first',headquarters:site}));
+  assert.match(html,/1 artículo asignado directamente/);assert.match(html,/Ver en el listado/);assert.doesNotMatch(html,/ec-catalog-products/);
+  const count=h.calls.find(c=>c.table==='inventory_catalog_items');assert.equal(count.head,true);
+  assert.ok(count.filters.some(([op,key,value])=>key==='headquarters_id'&&value===site));
+  for(const role of ['admin','editor','reader']){
+    const tree=await harness({role}).page({category:'overalls',headquarters:site});
+    const rendered=renderToStaticMarkup(tree);
+    assert.equal(rendered.includes('Nuevo artículo'),role!=='reader');
+    if(role!=='reader') {assert.match(rendered,/data-category="overalls"/);assert.match(rendered,new RegExp(`data-site="${site}"`));}
   }
 });
 

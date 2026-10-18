@@ -19,7 +19,9 @@ const Link = ({ children, prefetch, ...props }) => React.createElement('a', { ..
 test('four ERP areas preserve every operational route and isolate volunteer navigation', () => {
   const areas = navigation.workspaceAreas('admin');
   assert.deepEqual(Array.from(areas, area => area.id), ['catalog', 'warehouse', 'people', 'settings']);
-  assert.equal(areas.flatMap(area => area.links).length, 15);
+  assert.equal(areas.flatMap(area => area.links).length, 14);
+  assert.ok(!areas[0].links.some(link => ['/dashboard/inventory','/dashboard/templates','/dashboard/templates/fields'].includes(link.href)));
+  assert.ok(areas.find(area => area.id==='settings').links.some(link => link.href==='/dashboard/templates'));
   assert.equal(areas[0].links[0].href, '/dashboard/catalog');
   const reader = navigation.workspaceAreas('reader');
   assert.ok(reader[0].links.some(link => link.href === '/dashboard/catalog'));
@@ -30,8 +32,9 @@ test('deep item and QR routes activate the right area without changing their URL
   const areas = navigation.workspaceAreas('admin');
   for (const [path, selected] of [
     ['/dashboard/catalog', '/dashboard/catalog'],
-    ['/dashboard/inventory/example-id', '/dashboard/inventory'],
-    ['/dashboard/stock/position-qr', '/dashboard/inventory'],
+    ['/dashboard/inventory', '/dashboard/catalog'],
+    ['/dashboard/inventory/example-id', '/dashboard/catalog'],
+    ['/dashboard/stock/position-qr', '/dashboard/catalog'],
     ['/dashboard/locations/physical', '/dashboard/locations/physical'],
     ['/dashboard/locations/containers/example-id', '/dashboard/locations'],
     ['/dashboard/templates/fields', '/dashboard/templates/fields'],
@@ -60,11 +63,13 @@ test('shell exposes accessible mobile dialog and only permitted tabs, without ea
 test('section search handles accents and words in any order without exposing restricted links', () => {
   assert.equal(navigation.searchWorkspaceLinks('admin', 'catalogo categorias')[0].href, '/dashboard/templates/categories');
   assert.equal(navigation.searchWorkspaceLinks('admin', 'permisos usuarios')[0].href, '/dashboard/users');
+  assert.equal(navigation.searchWorkspaceLinks('reader', 'articulos')[0].href, '/dashboard/catalog');
+  assert.equal(navigation.searchWorkspaceLinks('admin', 'fichas')[0].href, '/dashboard/templates');
   assert.equal(navigation.searchWorkspaceLinks('reader', 'usuarios').length, 0);
   assert.equal(navigation.searchWorkspaceLinks('editor', 'campos').length, 0);
   assert.equal(navigation.searchWorkspaceLinks('volunteer', 'inventario').length, 0);
   assert.deepEqual(Array.from(navigation.searchWorkspaceLinks('volunteer', ''), link => link.href), ['/dashboard/personal', '/dashboard/requests']);
-  assert.equal(navigation.searchWorkspaceLinks('admin', '   ').length, 15);
+  assert.equal(navigation.searchWorkspaceLinks('admin', '   ').length, 14);
 });
 
 function optionsHarness(role = 'admin', failTable) {

@@ -26,7 +26,7 @@ test('sizes use natural order, never invent absent sizes, and numeric totals ret
 });
 test('one garment header shows total, tallies, selected size and original QR-compatible item links', () => {
   const { SizeSummary } = load('app/dashboard/inventory/size-summary.tsx', {
-    'next/link': ({ children, ...props }) => React.createElement('a', props, children),
+    'next/link': ({ children, prefetch, ...props }) => React.createElement('a', props, children),
     '../qr-modal': { QrModal: ({ path }) => React.createElement('span', null, path) },
     '@/lib/inventory/size-catalog': model,
     '@/lib/inventory/expiry-status': load('lib/inventory/expiry-status.ts')
@@ -35,6 +35,6 @@ test('one garment header shows total, tallies, selected size and original QR-com
     selectedId: 'm', product: { id: 'xl', name: 'MONO', unit: 'unidades', current_stock: 8, size_count: 3, variants }
   }));
   assert.match(html, /<h1[^>]*>MONO<\/h1>/); assert.match(html, /8 unidades en total/);
-  assert.match(html, /Sin existencias/); assert.match(html, /href="\/dashboard\/inventory\/m#talla" aria-current="true"/);
+  assert.match(html, /Sin existencias/); assert.match(html, /href="\/dashboard\/inventory\/m\?section=stock#talla" aria-current="true"/);
   assert.match(html, /\/dashboard\/inventory\/xl/); assert.doesNotMatch(html, /<th scope="row">S<\/th>/);
 });

@@ -527,6 +527,7 @@ export async function createInventoryItem(
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/inventory");
   revalidatePath("/dashboard/locations");
+  revalidatePath("/dashboard/catalog");
   return { success: "Artículo creado correctamente.", itemId: String(insertedItem), itemName };
 }
 

@@ -66,7 +66,7 @@ function CategoryParentSelect({ categories, value = "" }: { categories: Category
       <option value="">Ninguna (categoría principal)</option>
       {categories.map(category => <option key={category.code} value={category.code}>{category.name}</option>)}
     </select>
-    <span className="ec-help">Selecciona otra categoría para situarla dentro de ella, o «Ninguna» para que sea principal. Conserva sus fichas, artículos y subcategorías.</span>
+    <span className="ec-help">Selecciona otra categoría para situarla dentro de ella, o «Ninguna» para que sea principal. Conserva sus fichas, artículos y subcategorías. En el explorador, las carpetas con subcategorías solo muestran carpetas: sus artículos directos siguen accesibles desde el listado.</span>
   </label>;
 }
 
@@ -118,7 +118,7 @@ export function CreateCategoryModal({ categories, parentCode }: { categories: Ca
   );
 }
 
-export function CreateTemplateForm({ categories }: { categories: CategoryOption[] }) {
+export function CreateTemplateForm({ categories, categoryCode }: { categories: CategoryOption[]; categoryCode?: string }) {
   const [state, formAction, pending] = useActionState(createInventoryTemplate, undefined);
 
   return (
@@ -126,7 +126,7 @@ export function CreateTemplateForm({ categories }: { categories: CategoryOption[
       <NameAndCodeFields placeholder="Taladro a batería" />
       <label className="ec-label">
         <span>Categoría</span>
-        <select className="ec-select" defaultValue="" name="categoryCode" required>
+        <select className="ec-select" defaultValue={categoryCode ?? ""} name="categoryCode" required>
           <option disabled value="">
             Selecciona una categoría
           </option>
@@ -144,24 +144,24 @@ export function CreateTemplateForm({ categories }: { categories: CategoryOption[
       {state?.error ? <p className="ec-error">{state.error}</p> : null}
       {state?.success ? <p className="ec-success">{state.success}</p> : null}
       <button className="ec-btn ec-btn-primary ec-btn-block" disabled={pending} type="submit">
-        {pending ? "Guardando..." : "Crear tipo de artículo"}
+        {pending ? "Guardando..." : "Crear plantilla"}
       </button>
     </form>
   );
 }
 
-export function CreateTemplateModal({ categories }: { categories: CategoryOption[] }) {
+export function CreateTemplateModal({ categories, categoryCode }: { categories: CategoryOption[]; categoryCode?: string }) {
   const [open, setOpen] = useState(false);
 
   return (
     <>
       <button className="ec-btn ec-btn-primary" onClick={() => setOpen(true)} type="button">
-        Nuevo tipo
+        Nueva plantilla
       </button>
 
-      <ModalShell kicker="Catálogo" open={open} setOpen={setOpen} title="Crear tipo de artículo">
-        <p className="ec-help">Define el nombre y la categoría. Después selecciona el tipo en la tabla y pulsa «Añadir campo» para configurar su ficha.</p>
-        <CreateTemplateForm categories={categories} />
+      <ModalShell kicker="Configuración" open={open} setOpen={setOpen} title="Crear plantilla de producto">
+        <p className="ec-help">Define el nombre y la categoría. Después selecciona la plantilla en la tabla y pulsa «Añadir campo». Esta configuración no crea existencias.</p>
+        <CreateTemplateForm categories={categories} categoryCode={categoryCode} />
       </ModalShell>
     </>
   );

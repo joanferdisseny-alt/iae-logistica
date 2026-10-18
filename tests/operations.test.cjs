@@ -22,7 +22,7 @@ function load(relative, mocks) {
   vm.runInNewContext(source, {
     module, exports: module.exports,
     require: (name) => Object.hasOwn(mocks, name) ? mocks[name] : require(name),
-    URL, Date, FormData, console
+    URL, URLSearchParams, Date, FormData, console
   }, { filename });
   return module.exports;
 }
@@ -102,6 +102,8 @@ function harness(options = {}) {
     "@/lib/inventory/expiry-status": load("lib/inventory/expiry-status.ts", {}),
     "@/lib/inventory/product-source": load("lib/inventory/product-source.ts", {}),
     "../size-summary": { SizeSummary: () => null },
+    "../product-navigation": { ProductNavigation: () => null },
+    "@/lib/inventory/product-sections": load("lib/inventory/product-sections.ts", {}),
     "next/navigation": { notFound: () => { throw new Error("NOT_FOUND"); } },
     "next/link": ({ children }) => children,
     "@/app/dashboard/inventory/add-relation-form": { AddRelationForm: ({ options }) => `RELATION_OPTIONS:${options.length}` },
@@ -235,14 +237,17 @@ test("read-only detail scopes the item by site and never loads option catalogues
   }
 });
 
-test("admin detail scopes relations to the item site and includes the distributed stock section", async () => {
+test("history loads only its paginated records and stock lives in its own section", async () => {
   const h = harness();
   const html = renderToStaticMarkup(await h.page({ params: Promise.resolve({ itemId }), searchParams: Promise.resolve({ historyPage: "2" }) }));
   for (const query of h.queries.filter((query) => ["locations", "inventory_containers"].includes(query.table) || query.filters.some((filter) => filter[0] === "neq"))) {
     assert.ok(query.filters.some((filter) => filter.join(":") === `or:headquarters_id.eq.${headquartersId}`));
   }
-  assert.match(html, /ADMIN_OPERATIONS/);
-  assert.match(html, /STOCK_DISTRIBUTION:/);
+  assert.doesNotMatch(html, /ADMIN_OPERATIONS|STOCK_DISTRIBUTION:/);
+  assert.ok(!h.queries.some(query => ['inventory_item_relations','inventory_attachments'].includes(query.table)));
+  const stock = harness();
+  assert.match(renderToStaticMarkup(await stock.page({ params: Promise.resolve({ itemId }), searchParams: Promise.resolve({ section: 'stock' }) })), /STOCK_DISTRIBUTION:/);
+  assert.equal(stock.queries.length, 2);
   for (const query of h.queries.filter((query) => ["inventory_movements", "inventory_item_history"].includes(query.table))) {
     assert.deepEqual(Array.from(query.range), [50, 100]);
   }
@@ -259,7 +264,7 @@ test("relation options paginate the complete site catalogue and reject partial r
     id: String(index), name: `Material ${index}`, current_stock: 1, status: "ok", unit: "uds."
   })) };
   const h = harness({ rows });
-  const html = renderToStaticMarkup(await h.page({ params: Promise.resolve({ itemId }) }));
+  const html = renderToStaticMarkup(await h.page({ params: Promise.resolve({ itemId }), searchParams: Promise.resolve({ section: 'resources' }) }));
   assert.match(html, /RELATION_OPTIONS:501/);
   const queries = h.queries.filter(query => query.table === "inventory_items" && query.range);
   assert.deepEqual(queries.map(query => Array.from(query.range)), [[0, 499], [500, 999]]);
@@ -268,7 +273,7 @@ test("relation options paginate the complete site catalogue and reject partial r
     assert.ok(query.filters.some(filter => filter.join(":") === `neq:id:${itemId}`));
   }
   const failed = harness({ rows, failLaterOptions: true });
-  const failureHtml = renderToStaticMarkup(await failed.page({ params: Promise.resolve({ itemId }) }));
+  const failureHtml = renderToStaticMarkup(await failed.page({ params: Promise.resolve({ itemId }), searchParams: Promise.resolve({ section: 'resources' }) }));
   assert.match(failureHtml, /No se pudo cargar el catálogo completo/);
   assert.doesNotMatch(failureHtml, /RELATION_OPTIONS/);
 });
@@ -278,10 +283,23 @@ test("detail renders safe links only and reports history query failures", async 
     { id: "a", title: "Manual", url: "https://example.org/manual.pdf" },
     { id: "b", title: "Unsafe", url: "javascript:alert(1)" }
   ] }, queryErrors: { inventory_movements: { message: "Missing column" } } });
-  const html = renderToStaticMarkup(await h.page({ params: Promise.resolve({ itemId }) }));
+  const html = renderToStaticMarkup(await h.page({ params: Promise.resolve({ itemId }), searchParams: Promise.resolve({ section: 'resources' }) }));
   assert.match(html, /href="https:\/\/example.org\/manual.pdf"/);
   assert.match(html, /noopener noreferrer/);
   assert.doesNotMatch(html, /href="javascript:/);
   assert.match(html, /enlace no válido/);
-  assert.match(html, /No se pudieron cargar los movimientos/);
+  assert.doesNotMatch(html, /No se pudieron cargar los movimientos/);
+  const historyHtml = renderToStaticMarkup(await h.page({ params: Promise.resolve({ itemId }), searchParams: Promise.resolve({ section: 'history' }) }));
+  assert.match(historyHtml, /No se pudieron cargar los movimientos/);
+});
+
+test('overview only loads the item and grouped catalogue, not histories, documents or stock options', async () => {
+  for (const role of ['admin','editor','reader']) {
+    const h=harness({role});
+    const html=renderToStaticMarkup(await h.page({params:Promise.resolve({itemId})}));
+    assert.deepEqual(h.queries.map(query=>query.table),['inventory_items','inventory_catalog_items']);
+    assert.match(html,/Información del artículo/);
+    assert.doesNotMatch(html,/STOCK_DISTRIBUTION|RELATION_OPTIONS/);
+    assert.equal(html.includes('ADMIN_OPERATIONS'),role==='admin');
+  }
 });

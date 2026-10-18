@@ -6,6 +6,9 @@ import type { InventoryCategory } from "@/lib/inventory/categories";
 import { catalogCategoryNodes, catalogHref, type CatalogCategoryNode } from "@/lib/inventory/catalog-browser";
 import { sizeTotals, type SizeVariant } from "@/lib/inventory/size-catalog";
 import { CategoryTree } from "./category-tree";
+import { CatalogViews } from "./catalog-views";
+import { CreateItemModal } from "../inventory/create-item-modal";
+import { CreateCategoryModal } from "../templates/forms";
 
 export const dynamic = "force-dynamic";
 const PAGE_SIZE = 50;
@@ -24,7 +27,7 @@ function CatalogError({ message }: { message: string }) {
 }
 
 export default async function CatalogPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  const { supabase, profile, isAdmin } = await requireAccess();
+  const { supabase, profile, isAdmin, roleCode } = await requireAccess();
   if (!profile.is_active || (!isAdmin && !profile.headquarters_id)) return <CatalogError message="Necesitas un perfil activo y una sede asignada. Contacta con un administrador." />;
   const params = await searchParams;
   const param = (key: string) => (Array.isArray(params[key]) ? params[key][0] : params[key])?.trim() ?? "";
@@ -51,10 +54,19 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
   if (category && !selected) return <CatalogError message="Esta categoría ya no existe o no está disponible. Vuelve al catálogo para elegir otra." />;
   if (headquarters && !sites.some(site => site.id === headquarters)) return <CatalogError message="La sede seleccionada ya no está disponible." />;
   const showProducts = !!selected && !selected.hasChildren;
+  const canCreate = isAdmin || ["editor", "operator"].includes(roleCode);
   const q = showProducts ? param("q").slice(0, 120) : "";
   const filters = { category, q, headquarters: isAdmin ? headquarters : "" };
   let products: Product[] = [];
   let total = 0;
+  let directCount: number | null = 0;
+  if (selected?.hasChildren) {
+    // Do not render products in intermediate folders, but never silently hide old assignments.
+    const query = supabase.from("inventory_catalog_items").select("id", { count: "exact", head: true }).eq("category", category);
+    if (headquarters) query.eq("headquarters_id", headquarters);
+    const response = await query;
+    directCount = response.error ? null : response.count;
+  }
   if (showProducts) {
     const query = (head = false) => {
       const result = supabase.from("inventory_catalog_items").select(head ? "id" : "id, name, category, headquarters_id, current_stock, unit, status, is_size_group, size_count, variants", { count: "exact", head })
@@ -91,9 +103,13 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
   return <div className="ec-page ec-catalog-explorer">
     <section className="ec-card">
       <div className="ec-card-header ec-row-wrap">
-        <div className="ec-col"><h1 className="ec-h1">Explorar catálogo</h1><span className="ec-help">Categorías, subcategorías y artículos, en un mismo lugar.</span></div>
-        <Link className="ec-btn" href={`/dashboard/inventory${inventoryParams.size ? `?${inventoryParams}` : ""}`}>Gestionar artículos</Link>
+        <div className="ec-col"><h1 className="ec-h1">Productos</h1><span className="ec-help">Abre una categoría para consultar o dar de alta sus artículos.</span></div>
+        <div className="ec-actions">
+          {isAdmin && <CreateCategoryModal categories={nodes.map(node => ({ code: node.code, name: node.path }))} parentCode={category || undefined} />}
+          {showProducts && canCreate && <CreateItemModal categoryCode={category} headquartersId={headquarters || undefined} />}
+        </div>
       </div>
+      <CatalogViews view="folders" {...filters} />
       <form className="ec-card-body ec-catalog-filters" method="get" action="/dashboard/catalog">
         {category && <input type="hidden" name="category" value={category} />}
         {showProducts && <label className="ec-label">Buscar en esta categoría<input className="ec-input" type="search" name="q" defaultValue={q} maxLength={120} placeholder="Nombre de artículo o prenda…" /></label>}
@@ -120,6 +136,11 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
           </Link>)}</div>
         </section>}
         {!showProducts && <p className="ec-help">{nodes.length ? "Abre las carpetas hasta llegar a la categoría final para ver sus artículos." : "Todavía no hay categorías creadas."}</p>}
+        {selected?.hasChildren && (directCount === null || directCount > 0) && <aside className="ec-catalog-notice" role="status">
+          <strong>{directCount === null ? "No se pudieron comprobar los artículos de esta carpeta." : `${directCount} ${directCount === 1 ? "artículo asignado" : "artículos asignados"} directamente a ${selected.name}`}</strong>
+          <p className="ec-help">Esta carpeta contiene subcategorías. Sus artículos directos se conservan y siguen disponibles en el listado; no se han movido ni eliminado.</p>
+          <Link className="ec-btn" href={`/dashboard/inventory${inventoryParams.size ? `?${inventoryParams}` : ""}`} prefetch={false}>Ver en el listado</Link>
+        </aside>}
         {showProducts && <div className="ec-col">
           <h2 className="ec-h2">Artículos de {selected!.name}</h2>
           <p className="ec-help" role="status">{total ? `${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, total)} de ${total} artículos` : "0 artículos"}. La búsqueda recorre todos los artículos de esta categoría, no solo esta página.</p>

@@ -12,6 +12,16 @@ Aplicación de inventario y logística para una ONG dedicada al rescate, constru
 - Reparto de existencias por lote entre varias cajas y ubicaciones dentro de cada sede.
 - Importación inicial de uniformidad (Excel/CSV), voluntarios, entregas históricas y nuevas, devoluciones y acceso personal.
 
+## Catálogo y ficha de producto
+
+**Catálogo > Productos** ofrece dos vistas del mismo inventario: **Por categorías** y **Listado y stock**. Las rutas anteriores y los QR siguen funcionando. El explorador muestra artículos solo en categorías finales; si una carpeta intermedia tiene artículos asignados directamente, muestra un aviso y un acceso al listado, sin moverlos ni borrarlos. El recuento respeta los permisos de la sede.
+
+Desde una categoría final se puede abrir **Nuevo artículo** con categoría y sede preseleccionadas. El formulario ofrece solo sus plantillas; si no hay ninguna, bloquea el alta y permite al administrador configurar una. Las plantillas y campos se encuentran en **Configuración**, sin alterar los permisos de creación existentes.
+
+La ficha separa Información, Tallas (cuando existen), Existencias, Documentos y compatibles, e Historial. Solo la sección abierta consulta su contenido: abrir Información no descarga los movimientos, documentos ni el catálogo de posibles compatibles. Cambiar de talla mantiene la sección; las operaciones siguen correspondiendo a esa talla, no al total del producto. Se conservan los enlaces antiguos a historiales y ubicaciones.
+
+Esta reorganización no requiere SQL ni cambios en datos existentes. La agrupación de variantes sigue limitada a la uniformidad importada; generalizarla a otros atributos o compartir fichas entre sedes requiere una migración posterior, no unir artículos automáticamente por nombre.
+
 ## Actualizar el proyecto existente
 
 Para activar Uniformidad y el acceso personal, ejecuta `supabase/upgrade-uniformity.sql` completo en SQL Editor del proyecto Supabase de la aplicación, antes de desplegar este código. Incluye las subcategorías y las actualizaciones anteriores. Conserva el catálogo existente y registra las migraciones para no repetirlas. No uses `install.sql` sobre una base con datos. Haz una copia de seguridad antes de actualizar.

@@ -40,9 +40,9 @@ function LazyDialog<T>({ label, title, load, render, primary = false }: {
   </>;
 }
 
-export function CreateItemModal() {
+export function CreateItemModal({ categoryCode, headquartersId }: { categoryCode?: string; headquartersId?: string } = {}) {
   return <LazyDialog label="Nuevo artículo" title="Añadir artículo" load={loadCreateItemOptions} primary
-    render={(data, setBusy) => <CreateForm {...data} onBusy={setBusy} />} />;
+    render={(data, setBusy) => <CreateForm {...data} initialCategoryCode={categoryCode} initialHeadquartersId={headquartersId} onBusy={setBusy} />} />;
 }
 
 export function InventoryAlertsModal() {

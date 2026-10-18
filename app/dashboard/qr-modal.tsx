@@ -6,11 +6,12 @@ import { useEffect, useMemo, useState } from "react";
 
 type QrModalProps = {
   label: string;
+  buttonLabel?: string;
   path: string;
   title: string;
 };
 
-export function QrModal({ label, path, title }: QrModalProps) {
+export function QrModal({ label, buttonLabel = "QR", path, title }: QrModalProps) {
   const [open, setOpen] = useState(false);
   const [qrUrl, setQrUrl] = useState("");
   const targetUrl = useMemo(() => {
@@ -37,7 +38,7 @@ export function QrModal({ label, path, title }: QrModalProps) {
   return (
     <>
       <button className="ec-btn" aria-label={`${label}: ${title}`} onClick={() => setOpen(true)} type="button">
-        QR
+        {buttonLabel}
       </button>
 
       {open ? (

@@ -24,6 +24,9 @@ export function CreateInventoryItemForm({
   headquarters,
   locations,
   templates,
+  categories,
+  initialCategoryCode,
+  initialHeadquartersId,
   userHeadquartersId,
   onCreated,
   draftKey,
@@ -34,6 +37,9 @@ export function CreateInventoryItemForm({
   headquarters: HeadquartersOption[];
   locations: PlacementOption[];
   templates: InventoryTemplateDefinition[];
+  categories?: { code: string; name: string }[];
+  initialCategoryCode?: string;
+  initialHeadquartersId?: string;
   userHeadquartersId: string | null;
   onCreated?: (id: string, name: string) => void;
   draftKey?: string;
@@ -85,10 +91,15 @@ export function CreateInventoryItemForm({
     }catch{}
   },[draftKey]);
   useEffect(()=>{onBusy?.(pending||creationUncertain);return()=>onBusy?.(false);},[pending,creationUncertain,onBusy]);
-  const [selectedTemplateCode, setSelectedTemplateCode] = useState(templates[0]?.code ?? "");
+  const categoryOptions = categories ?? Array.from(new Map(templates.map(template => [template.category,
+    { code: template.category, name: template.categoryName ?? template.category }])).values());
+  const startingCategory = initialCategoryCode ?? templates[0]?.category ?? "";
+  const [selectedCategory, setSelectedCategory] = useState(startingCategory);
+  const [selectedTemplateCode, setSelectedTemplateCode] = useState(templates.find(template => template.category === startingCategory)?.code ?? "");
   const [placementType, setPlacementType] = useState<"none" | "location" | "container">("none");
-  const [selectedHeadquarters, setSelectedHeadquarters] = useState(userHeadquartersId ?? "");
-  const selectedTemplate = templates.find((template) => template.code === selectedTemplateCode) ?? templates[0];
+  const [selectedHeadquarters, setSelectedHeadquarters] = useState(canChooseHeadquarters ? initialHeadquartersId ?? userHeadquartersId ?? "" : userHeadquartersId ?? "");
+  const visibleTemplates = templates.filter(template => template.category === selectedCategory);
+  const selectedTemplate = visibleTemplates.find((template) => template.code === selectedTemplateCode);
   const visibleLocations = locations.filter(option => option.headquarters_id === selectedHeadquarters);
   const visibleContainers = containers.filter(option => option.headquarters_id === selectedHeadquarters);
 
@@ -96,9 +107,9 @@ export function CreateInventoryItemForm({
     return (
       <div className="ec-stack">
         <p className="ec-muted">
-          Todavía no hay tipos de artículo configurados. Un administrador debe crear uno y asignarle los campos.
+          Todavía no hay plantillas de producto configuradas. Un administrador debe crear una y asignarle los campos.
         </p>
-        {canChooseHeadquarters && <Link className="ec-btn" href="/dashboard/templates">Configurar tipos de artículo</Link>}
+        {canChooseHeadquarters && <Link className="ec-btn" href="/dashboard/templates">Configurar plantillas</Link>}
       </div>
     );
   }
@@ -108,7 +119,7 @@ export function CreateInventoryItemForm({
       {onCreated && <p className="ec-help">Alta de catálogo sin existencias. Después se asociará el código y un administrador confirmará la entrada.</p>}
       <fieldset className="ec-stack ec-receiving-fieldset" disabled={pending || creationUncertain}>
       <input name="templateCode" type="hidden" value={selectedTemplate?.code ?? ""} />
-      <input name="category" type="hidden" value={selectedTemplate?.category ?? "material"} />
+      <input name="category" type="hidden" value={selectedTemplate?.category ?? selectedCategory} />
       {!canChooseHeadquarters ? (
         <input name="headquartersId" type="hidden" value={userHeadquartersId ?? ""} />
       ) : null}
@@ -128,28 +139,42 @@ export function CreateInventoryItemForm({
         </label>
       ) : null}
 
+      <label className="ec-label">Categoría / subcategoría
+        <select className="ec-select" value={selectedCategory} name="categorySelector" required onChange={event => {
+          setSelectedCategory(event.target.value);
+          setSelectedTemplateCode(templates.find(template => template.category === event.target.value)?.code ?? "");
+        }}>
+          <option value="">Selecciona una categoría</option>
+          {selectedCategory && !categoryOptions.some(category => category.code === selectedCategory) && <option value={selectedCategory}>Categoría no disponible</option>}
+          {categoryOptions.map(category => <option key={category.code} value={category.code}>{category.name}</option>)}
+        </select>
+      </label>
       <label className="ec-label">
-        <span>Tipo de artículo</span>
+        <span>Plantilla de campos</span>
         <select
           className="ec-select"
           name="templateCodeSelector"
           onChange={(event) => setSelectedTemplateCode(event.target.value)}
           value={selectedTemplate?.code ?? ""}
+          required
+          disabled={!visibleTemplates.length}
         >
-          {Array.from(new Set(templates.map(template => template.category))).map(category => <optgroup key={category} label={templates.find(template => template.category === category)?.categoryName ?? category}>
-            {templates.filter(template => template.category === category).map(template => <option key={template.code} value={template.code}>{template.name}</option>)}
-          </optgroup>)}
+          {!selectedTemplate && <option value="">Sin plantilla en esta categoría</option>}
+          {visibleTemplates.map(template => <option key={template.code} value={template.code}>{template.name}</option>)}
         </select>
       </label>
 
       </div>
+      {!selectedTemplate && <p className="ec-error" role="alert">Esta categoría no tiene una plantilla disponible. No se creará el artículo en otra categoría.
+        {canChooseHeadquarters ? <> <Link href={`/dashboard/templates?category=${encodeURIComponent(selectedCategory)}`} target="_blank">Configurar plantilla</Link>. Cierra y vuelve a abrir este formulario para cargar los cambios.</> : " Pide a un administrador que configure sus campos."}
+      </p>}
       {selectedTemplate ? <p className="ec-help">{selectedTemplate.description}</p> : null}
 
       <section className="ec-template-fields ec-item-fields" key={selectedTemplate?.code}>
         <div className="ec-col">
           <h3 className="ec-h3">Datos del artículo</h3>
           <div className="ec-help">
-            Completa los campos del tipo seleccionado. Los marcados con * son obligatorios.
+            Completa los campos de la plantilla seleccionada. Los marcados con * son obligatorios.
           </div>
         </div>
 
@@ -282,7 +307,7 @@ export function CreateInventoryItemForm({
       {creationUncertain && <p className="ec-help">Hay un alta sin confirmar. Se reenviarán los datos originales guardados, no los campos que se muestran ahora.</p>}
       {state?.success ? <p className="ec-success">{state.success}</p> : null}
 
-      <button className="ec-btn ec-btn-primary ec-btn-block" type="submit" disabled={pending}>
+      <button className="ec-btn ec-btn-primary ec-btn-block" type="submit" disabled={pending || (!selectedTemplate && !creationUncertain)}>
         {pending ? "Guardando..." : creationUncertain ? "Reintentar la misma alta" : "Crear artículo"}
       </button>
     </form>

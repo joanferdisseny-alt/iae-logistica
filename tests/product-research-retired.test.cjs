@@ -103,3 +103,25 @@ test('restoring a pre-removal pending submission retains source and id instead o
   assert.equal(JSON.stringify(calls[0]),JSON.stringify(entries));
   assert.equal(saved.has('pending'),false);
 });
+
+test('contextual creation keeps category and site, filters templates and never falls back to another category', () => {
+  const ui=hooks();
+  const {CreateInventoryItemForm}=load('app/dashboard/inventory/create-item-form.tsx',{
+    react:ui.react,'../checklists/id':{newChecklistId:()=>id},'@/app/dashboard/actions':{createInventoryItem:async()=>({})}
+  });
+  const props={canChooseHeadquarters:true,containers:[],locations:[],headquarters:[{id},{id:foreign}],userHeadquartersId:id,
+    initialCategoryCode:'clothing',initialHeadquartersId:foreign,
+    categories:[{code:'tools',name:'Tools'},{code:'clothing',name:'Clothing'},{code:'empty',name:'Empty'}],
+    templates:[{code:'drill',category:'tools',fields:[]},{code:'shirt',category:'clothing',fields:[{key:'size',label:'Size',type:'text'}]}]};
+  let tree=ui.render(CreateInventoryItemForm,props);
+  const field=name=>all(tree).find(n=>n.props?.name===name);
+  assert.equal(field('category').props.value,'clothing');assert.equal(field('templateCode').props.value,'shirt');
+  assert.equal(field('headquartersId').props.value,foreign);
+  assert.equal(all(field('templateCodeSelector')).some(n=>n.type==='option'&&n.props.value==='drill'),false);
+  field('categorySelector').props.onChange({target:{value:'empty'}});tree=ui.render(CreateInventoryItemForm,props);
+  assert.equal(field('category').props.value,'empty');assert.equal(field('templateCode').props.value,'');
+  assert.equal(all(tree).find(n=>n.type==='button'&&n.props.type==='submit').props.disabled,true);
+  assert.ok(all(tree).some(n=>n.props?.role==='alert'));
+  field('categorySelector').props.onChange({target:{value:'tools'}});tree=ui.render(CreateInventoryItemForm,props);
+  assert.equal(field('templateCode').props.value,'drill');assert.equal(field('templateField_size'),undefined);
+});

@@ -41,7 +41,7 @@ export async function loadCreateItemOptions() {
     })
   }));
   const byId = new Map(locations.map(location => [location.id, location]));
-  return { canChooseHeadquarters: isAdmin, userHeadquartersId: profile.headquarters_id, headquarters, templates,
+  return { canChooseHeadquarters: isAdmin, userHeadquartersId: profile.headquarters_id, headquarters, templates, categories: categoryOptions(categories),
     containers: containers.map(place => ({ ...place, name: place.code ? `${place.name} · ${place.code}` : place.name })),
     locations: locations.map(place => {
       const path: string[] = []; const visited = new Set<string>(); let cursor: Place | undefined = place;

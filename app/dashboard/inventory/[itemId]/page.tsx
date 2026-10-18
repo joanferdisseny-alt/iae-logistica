@@ -10,6 +10,8 @@ import { productProviders, productSourceSchema, productSourceUrl } from "@/lib/i
 import { currentInventoryStatus, inventoryToday } from "@/lib/inventory/expiry-status";
 import { SizeSummary } from "../size-summary";
 import type { SizeProduct } from "@/lib/inventory/size-catalog";
+import { ProductNavigation } from "../product-navigation";
+import { productSectionHref, resolveProductSection } from "@/lib/inventory/product-sections";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +29,8 @@ type ItemDetail = {
   category: string;
   subtype: string | null;
   description: string | null;
+  sku: string | null;
+  serial_number: string | null;
   current_stock: number;
   minimum_stock: number | null;
   unit: string | null;
@@ -41,6 +45,7 @@ type ItemDetail = {
   } | null;
   inventory_templates: {
     name: string;
+    inventory_template_fields?: Array<{ inventory_fields: { field_key: string; label: string } | null }>;
   } | null;
 };
 
@@ -133,13 +138,13 @@ export default async function InventoryItemPage({
   searchParams
 }: {
   params: Promise<{ itemId: string }>;
-  searchParams?: Promise<{ historyPage?: string }>;
+  searchParams?: Promise<{ historyPage?: string; section?: string }>;
 }) {
   const { itemId } = await params;
   const { supabase, profile, isAdmin } = await requireAccess();
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(itemId)) notFound();
   let itemQuery = supabase.from("inventory_items").select(
-    "id, headquarters_id, name, category, subtype, description, current_stock, minimum_stock, unit, status, operational_status, expiration_date, maintenance_due_at, technical_specs, location_id, locations(name), inventory_templates(name)"
+    "id, headquarters_id, name, category, subtype, description, sku, serial_number, current_stock, minimum_stock, unit, status, operational_status, expiration_date, maintenance_due_at, technical_specs, location_id, locations(name), inventory_templates(name, inventory_template_fields(inventory_fields(field_key, label)))"
   ).eq("id", itemId);
   if (!isAdmin) {
     if (!profile.headquarters_id) notFound();
@@ -158,18 +163,39 @@ export default async function InventoryItemPage({
   </div></section>;
   const product = productResult.data;
   const isSizeGroup = product.is_size_group;
+  const queryParams = await searchParams;
+  const section = resolveProductSection(queryParams?.section, isSizeGroup, queryParams?.historyPage);
+  const fieldLabels = new Map((item.inventory_templates?.inventory_template_fields ?? []).flatMap(assignment =>
+    assignment.inventory_fields ? [[assignment.inventory_fields.field_key, assignment.inventory_fields.label]] : []));
   const status = currentInventoryStatus(item, inventoryToday());
   const headquartersFilter = item.headquarters_id
     ? `headquarters_id.eq.${item.headquarters_id}` : "headquarters_id.is.null";
 
-  const requestedPage = Number((await searchParams)?.historyPage ?? 1);
+  const requestedPage = Number(queryParams?.historyPage ?? 1);
   const historyPage = Number.isSafeInteger(requestedPage) && requestedPage > 0 && requestedPage <= 100000 ? requestedPage : 1;
   const offset = (historyPage - 1) * 50;
-  const relationsResult = await supabase
+  const empty = <T,>() => ({ data: [] as T[], error: null });
+  const [relationsResult, otherItemsResult, movementsResult, historyResult, attachmentsResult] = await Promise.all([
+    section === "resources" ? supabase
     .from("inventory_item_relations")
     .select("id, relation_type, quantity_required, notes, target_item_id")
     .eq("source_item_id", itemId)
-    .returns<RelationRow[]>();
+    .returns<RelationRow[]>() : empty<RelationRow>(),
+    section === "resources" && isAdmin ? readRelationOptions((from, to) => supabase.from("inventory_items")
+      .select("id, name, current_stock, unit, status").neq("id", itemId).or(headquartersFilter)
+      .order("name").order("id").range(from, to).returns<RelatedItem[]>()) : empty<RelatedItem>(),
+    section === "history" ? supabase.from("inventory_movements")
+      .select("id, movement_type, quantity, balance_after, request_id, notes, created_by, created_at")
+      .eq("item_id", itemId).order("created_at", { ascending: false }).order("id", { ascending: false })
+      .range(offset, offset + 50).returns<MovementRow[]>() : empty<MovementRow>(),
+    section === "history" ? supabase.from("inventory_item_history")
+      .select("id, actor_id, event_type, details, created_at")
+      .eq("item_id", itemId).order("created_at", { ascending: false }).order("id", { ascending: false })
+      .range(offset, offset + 50).returns<HistoryRow[]>() : empty<HistoryRow>(),
+    section === "resources" ? supabase.from("inventory_attachments")
+      .select("id, title, url, storage_path").eq("item_id", itemId)
+      .order("created_at", { ascending: false }).returns<AttachmentRow[]>() : empty<AttachmentRow>()
+  ]);
   const relations = relationsResult.data;
   const relatedIds = relations?.map((relation) => relation.target_item_id) ?? [];
   const relatedResult = relatedIds.length
@@ -178,76 +204,66 @@ export default async function InventoryItemPage({
         .returns<RelatedItem[]>()
     : { data: [] as RelatedItem[], error: null };
 
-  // Readers/editors never load option catalogues; admin options stay within this item's site.
-  const otherItemsResult = isAdmin ? await readRelationOptions((from, to) => supabase.from("inventory_items")
-    .select("id, name, current_stock, unit, status").neq("id", itemId).or(headquartersFilter)
-    .order("name").order("id").range(from, to).returns<RelatedItem[]>()) : { data: [], error: null };
-  const movementsResult = await supabase.from("inventory_movements")
-    .select("id, movement_type, quantity, balance_after, request_id, notes, created_by, created_at")
-    .eq("item_id", itemId).order("created_at", { ascending: false }).order("id", { ascending: false })
-    .range(offset, offset + 50).returns<MovementRow[]>();
-  const historyResult = await supabase.from("inventory_item_history")
-    .select("id, actor_id, event_type, details, created_at")
-    .eq("item_id", itemId).order("created_at", { ascending: false }).order("id", { ascending: false })
-    .range(offset, offset + 50).returns<HistoryRow[]>();
-  const attachmentsResult = await supabase.from("inventory_attachments")
-    .select("id, title, url, storage_path").eq("item_id", itemId)
-    .order("created_at", { ascending: false }).returns<AttachmentRow[]>();
   const otherItems = otherItemsResult.data;
   const optionsError = otherItemsResult.error;
   const relatedItems = relatedResult.data;
   const canManage = isAdmin;
-  const effectiveLocation = "Ver existencias y ubicaciones";
   const relatedById = new Map((relatedItems ?? []).map((relatedItem) => [relatedItem.id, relatedItem]));
 
   return (
-    <div className="ec-page">
-      {isSizeGroup && <SizeSummary product={product} selectedId={item.id} />}
+    <div className="ec-page ec-product-page">
       <section className="ec-card ec-hero-card" id="talla">
         <div className="ec-card-body ec-stack">
           <div className="ec-row ec-row-between ec-row-wrap">
             <div className="ec-col">
-              <div className="ec-muted-2">{isSizeGroup ? "Detalle de la talla seleccionada" : "Ficha de inventario"}</div>
-              {isSizeGroup ? <h2 className="ec-h2">Talla {item.technical_specs.uniformidad_talla}</h2> : <h1 className="ec-h1">{item.name}</h1>}
-              {isSizeGroup && <p className="ec-help">Los movimientos, documentos e historiales de abajo corresponden a esta talla, no al total de la prenda.</p>}
+              <Link className="ec-help" href={`/dashboard/catalog?category=${encodeURIComponent(item.category)}${item.headquarters_id ? `&headquarters=${item.headquarters_id}` : ""}`} prefetch={false}>Volver a la categoría</Link>
+              <h1 className="ec-h1">{isSizeGroup ? product.name : item.name}</h1>
+              <span className="ec-help">{item.inventory_templates?.name ?? item.category}{isSizeGroup ? ` · ${product.current_stock} ${product.unit ?? "uds."} entre todas las tallas` : ""}</span>
             </div>
             <div className="ec-actions">
               <span className={`ec-badge ${badgeClass(status)}`}>{({ ok: "Correcto", low: "Stock bajo", expired: "Caducado", maintenance: "Mantenimiento" } as Record<string, string>)[status] ?? status}</span>
               <span className="ec-badge ec-badge-neutral">{operationalLabels[item.operational_status] ?? item.operational_status}</span>
               <QrModal
                 label={isSizeGroup ? "QR de talla" : "QR de ficha"}
+                buttonLabel={isSizeGroup ? "QR talla" : "QR ficha"}
                 path={`/dashboard/inventory/${item.id}`}
                 title={item.name}
               />
-              <Link className="ec-btn" href="/dashboard/inventory">
-                Volver
-              </Link>
+              {isSizeGroup && <QrModal label="QR de prenda" buttonLabel="QR prenda" path={`/dashboard/inventory/${product.id}`} title={product.name} />}
+              <Link className="ec-btn" href="/dashboard/inventory" prefetch={false}>Listado</Link>
             </div>
           </div>
 
-          <div className="ec-inline-notes">
-            <span className="ec-badge ec-badge-neutral">
-              {item.inventory_templates?.name ?? item.category}
-            </span>
-            <span className="ec-help">Ubicación: {effectiveLocation}</span>
-            <span className="ec-help">
-              Stock: {item.current_stock} {item.unit ?? "uds."}
-            </span>
-          </div>
-
-          {item.description ? <p className="ec-muted">{item.description}</p> : null}
-          <div className="ec-inline-notes">
-            <span className="ec-help">Stock mínimo: {item.minimum_stock ?? "Sin mínimo"}</span>
-            <span className="ec-help">Mantenimiento: {item.maintenance_due_at ?? "Sin programar"}</span>
-            <span className="ec-help">Caducidad: {item.expiration_date ?? "Sin fecha"}</span>
-          </div>
-          {canManage ? <OperationsForm item={item} distributedStock /> : <p className="ec-help">Acceso de consulta. Las operaciones están reservadas a administración.</p>}
-          {optionsError ? <p className="ec-error" role="alert">No se pudieron cargar las opciones de esta sede. La gestión de ubicación y relaciones no está disponible.</p> : null}
+          {isSizeGroup && <div className="ec-product-variant">
+            <details><summary>Talla {item.technical_specs.uniformidad_talla} · Cambiar talla</summary>
+              <nav className="ec-size-links" aria-label="Seleccionar talla">{product.variants.map(variant => <Link key={variant.id} href={productSectionHref(variant.id, section)} prefetch={false} aria-current={variant.id === item.id ? "page" : undefined}>{variant.size} · {variant.quantity} {item.unit ?? "uds."}</Link>)}</nav>
+            </details>
+            <span className="ec-help">Las operaciones, documentos y el historial corresponden a la talla seleccionada.</span>
+          </div>}
+          <div className="ec-inline-notes"><Link className="ec-link-strong" prefetch={false} href={productSectionHref(item.id, "stock")}>Stock{isSizeGroup ? " de esta talla" : ""}: {item.current_stock} {item.unit ?? "uds."} · Ver ubicaciones</Link></div>
         </div>
       </section>
-
-      <StockSection itemId={item.id} itemName={item.name} headquartersId={item.headquarters_id} unit={item.unit} />
-      <section className="ec-grid-admin">
+      <ProductNavigation itemId={item.id} section={section} hasSizes={isSizeGroup} />
+      {section === "sizes" && <SizeSummary product={product} selectedId={item.id} embedded />}
+      {section === "stock" && <StockSection itemId={item.id} itemName={item.name} headquartersId={item.headquarters_id} unit={item.unit} />}
+      {section === "overview" && <section className="ec-card">
+        <div className="ec-card-header ec-row-wrap"><h2 className="ec-h2">Información del artículo</h2>{canManage && <OperationsForm item={item} distributedStock />}</div>
+        <div className="ec-card-body ec-stack">
+          {item.description && <p>{item.description}</p>}
+          {!canManage && <p className="ec-help">Acceso de consulta. Las operaciones están reservadas a administración.</p>}
+          <dl className="ec-product-facts">
+            <div><dt>Referencia / SKU</dt><dd>{item.sku ?? "Sin referencia"}</dd></div>
+            <div><dt>Número de serie</dt><dd>{item.serial_number ?? "Sin serie"}</dd></div>
+            <div><dt>Stock mínimo</dt><dd>{item.minimum_stock ?? "Sin mínimo"}</dd></div>
+            <div><dt>Próximo mantenimiento</dt><dd>{item.maintenance_due_at ?? "Sin programar"}</dd></div>
+            <div><dt>Próxima caducidad</dt><dd>{item.expiration_date ?? "Sin fecha"}</dd></div>
+          </dl>
+          <h3 className="ec-h3">Características</h3>
+          {Object.keys(item.technical_specs ?? {}).length ? <dl className="ec-product-facts">{Object.entries(item.technical_specs ?? {}).map(([key, value]) => <div key={key}><dt>{fieldLabels.get(key) ?? key}</dt><dd>{String(value)}</dd></div>)}</dl> : <p className="ec-help">Esta ficha no tiene campos técnicos guardados.</p>}
+          <p className="ec-help">Cada lote conserva su propia caducidad. Consulta cantidades, cajas y destinos en Existencias.</p>
+        </div>
+      </section>}
+      {section === "resources" && <><section className={canManage ? "ec-grid-admin" : "ec-stack"}>
         <article className="ec-card">
           <div className="ec-card-header">
             <h2 className="ec-h2">Relaciones y compatibilidades</h2>
@@ -261,7 +277,7 @@ export default async function InventoryItemPage({
                 return (
                   <div className="ec-list-item" key={relation.id}>
                     <div>
-                      <strong>{related?.name ?? relation.target_item_id}</strong>
+                      <Link className="ec-link-strong" href={`/dashboard/inventory/${related.id}`} prefetch={false}>{related.name}</Link>
                       <div className="ec-muted">
                         {relation.relation_type} · necesita {relation.quantity_required ?? 1}
                       </div>
@@ -285,24 +301,6 @@ export default async function InventoryItemPage({
         </article>
 
         <div className="ec-stack ec-side-rail">
-          <article className="ec-card">
-            <div className="ec-card-header">
-              <h2 className="ec-h2">Datos técnicos</h2>
-            </div>
-            <div className="ec-card-body ec-list">
-              {Object.entries(item.technical_specs ?? {}).length ? (
-                Object.entries(item.technical_specs).map(([key, value]) => (
-                  <div className="ec-list-item" key={key}>
-                    <strong>{key}</strong>
-                    <span className="ec-muted">{String(value)}</span>
-                  </div>
-                ))
-              ) : (
-                <p className="ec-muted">Esta ficha no tiene campos técnicos guardados.</p>
-              )}
-            </div>
-          </article>
-
           {canManage && optionsError && <p className="ec-error" role="alert">No se pudo cargar el catálogo completo de artículos para asociar. Vuelve a cargar la ficha.</p>}
           {canManage && !optionsError ? (
             <article className="ec-card ec-card-toned">
@@ -341,8 +339,8 @@ export default async function InventoryItemPage({
             }) : <p className="ec-muted">No hay manuales enlazados.</p>}
         </div>
       </section>
-
-      <section className="ec-card" id="historial">
+      </>}
+      {section === "history" && <><section className="ec-card" id="historial">
         <div className="ec-card-header"><h2 className="ec-h2">Historial de movimientos</h2></div>
         <div className="ec-card-body ec-stack">
           <p className="ec-help">El ajuste representa el stock final contado. Saldo: existencias después del movimiento. Las fechas se muestran en horario de Madrid.</p>
@@ -373,10 +371,11 @@ export default async function InventoryItemPage({
         </div>
       </section>
       <nav aria-label="Páginas de ambos historiales" className="ec-actions ec-row-wrap">
-        {historyPage > 1 ? <Link className="ec-btn" href={`/dashboard/inventory/${item.id}?historyPage=${historyPage - 1}#historial`}>Anterior</Link> : null}
+        {historyPage > 1 ? <Link className="ec-btn" prefetch={false} href={productSectionHref(item.id, "history", historyPage - 1)}>Anterior</Link> : null}
         <span className="ec-help">Página {historyPage} · hasta 50 registros por historial</span>
-        {(movementsResult.data?.length ?? 0) > 50 || (historyResult.data?.length ?? 0) > 50 ? <Link className="ec-btn" href={`/dashboard/inventory/${item.id}?historyPage=${historyPage + 1}#historial`}>Siguiente</Link> : null}
+        {(movementsResult.data?.length ?? 0) > 50 || (historyResult.data?.length ?? 0) > 50 ? <Link className="ec-btn" prefetch={false} href={productSectionHref(item.id, "history", historyPage + 1)}>Siguiente</Link> : null}
       </nav>
+      </>}
     </div>
   );
 }

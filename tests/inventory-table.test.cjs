@@ -34,6 +34,7 @@ function harness({ role = 'admin', rows = {}, failTable, active = true } = {}) {
     ], ...rows
   };
   const page = load('app/dashboard/inventory/page.tsx', {
+    '../catalog/catalog-views': { CatalogViews: () => null },
     '@/lib/inventory/categories': load('lib/inventory/categories.ts'),
     '@/lib/inventory/expiry-status': load('lib/inventory/expiry-status.ts'),
     '@/lib/inventory/size-catalog': load('lib/inventory/size-catalog.ts'),
